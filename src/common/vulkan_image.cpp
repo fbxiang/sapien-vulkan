@@ -8,7 +8,9 @@ VulkanImageData::VulkanImageData(vk::PhysicalDevice physicalDevice, vk::Device d
                                  vk::ImageTiling tiling, vk::ImageUsageFlags usage,
                                  vk::ImageLayout initialLayout, vk::MemoryPropertyFlags memoryProperties,
                                  vk::ImageAspectFlags aspectMask)
-    : mFormat(format), mExtent(extent), mMipLevels(mipLevels) {
+    : mFormat(format), mExtent(extent), mMipLevels(mipLevels), mMemoryProperties(memoryProperties)
+{
+
   vk::ImageCreateInfo imageInfo (
       vk::ImageCreateFlags(), vk::ImageType::e2D, mFormat,
       vk::Extent3D(extent, 1), mipLevels, 1, vk::SampleCountFlagBits::e1, tiling,

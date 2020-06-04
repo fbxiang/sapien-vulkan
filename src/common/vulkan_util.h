@@ -73,4 +73,19 @@ void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::Image image, vk:
                            vk::PipelineStageFlags sourceStage, vk::PipelineStageFlags destStage,
                            vk::ImageAspectFlags aspectMask, uint32_t mipLevels=1);
 
+
+void updateDescriptorSets(
+    vk::Device device, vk::DescriptorSet descriptorSet,
+    std::vector<std::tuple<vk::DescriptorType, vk::Buffer, vk::BufferView>> const &bufferData,
+    std::vector<struct VulkanTextureData> const &textureData, uint32_t bindingOffset); 
+
+vk::UniqueCommandBuffer createCommandBuffer(vk::Device device, vk::CommandPool commandPool,
+                                            vk::CommandBufferLevel level);
+
+
+vk::UniqueDescriptorSetLayout createDescriptorSetLayout(
+    vk::Device device,
+    std::vector<std::tuple<vk::DescriptorType, uint32_t, vk::ShaderStageFlags>> const &bindingData,
+    vk::DescriptorSetLayoutCreateFlags flags = {}); 
+
 }

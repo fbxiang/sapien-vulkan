@@ -11,6 +11,22 @@ struct Vertex {
   glm::vec2 uv{};
   glm::vec3 tangent{};
   glm::vec3 bitangent{};
+
+  static std::vector<std::pair<vk::Format, std::uint32_t>> const &getFormatOffset() {
+    static_assert(offsetof(Vertex, position) == 0);
+    static_assert(offsetof(Vertex, normal) == 12);
+    static_assert(offsetof(Vertex, uv) == 24);
+    static_assert(offsetof(Vertex, tangent) == 32);
+    static_assert(offsetof(Vertex, bitangent) == 44);
+    static std::vector<std::pair<vk::Format, std::uint32_t>> v = {
+      {vk::Format::eR32G32B32Sfloat, offsetof(Vertex, position)},
+      {vk::Format::eR32G32B32Sfloat, offsetof(Vertex, normal)},
+      {vk::Format::eR32G32Sfloat, offsetof(Vertex, uv)},
+      {vk::Format::eR32G32B32Sfloat, offsetof(Vertex, tangent)},
+      {vk::Format::eR32G32B32Sfloat, offsetof(Vertex, bitangent)}
+    };
+    return v;
+  }
 };
 
 struct VulkanMesh {
