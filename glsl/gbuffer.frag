@@ -26,19 +26,16 @@ layout(binding = 0, set = 3) uniform MaterialUBO {
 //   PointLight pointLights[MAX_POINT_LIGHTS];
 // } sceneUBO;
 
-layout(location = 0) in vec4 inNormal;
-layout(location = 1) in vec4 inPosition;
+layout(location = 0) in vec4 inPosition;
+layout(location = 1) in mat3 inTbn;
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outPosition;
 layout(location = 2) out vec4 outSpecular;
 layout(location = 3) out vec4 outNormal;
 
 void main() {
-  // outAlbedo = materialUBO.diffuse;
-  // outSpecular = materialUBO.specular;
-  // outNormal = vec4(normalize(inNormal.xyz), 0) * 0.5 + 0.5;
   outPosition = inPosition;
   outAlbedo = vec4(1,0,1,1);
   outSpecular = vec4(0,0,0,0);
-  outNormal = vec4(normalize(inNormal.xyz), 0) * 0.5 + 0.5;
+  outNormal = vec4(normalize(inTbn * vec3(0,0,1)), 0) * 0.5 + 0.5;
 }

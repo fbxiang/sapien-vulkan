@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+#include "GLFW/glfw3.h"
 
 namespace svulkan
 {
@@ -57,6 +58,9 @@ class VulkanWindow {
   // imgui resources
   vk::UniqueRenderPass mImguiRenderPass;
 
+  ImVec2 mMousePos{0,0};
+  ImVec2 mMouseDelta{0,0};
+
  public:
   inline vk::SwapchainKHR getSwapchain() const { return mSwapchain.get(); }
   inline vk::Format getBackBufferFormat() const { return mSurfaceFormat.format; }
@@ -66,6 +70,7 @@ class VulkanWindow {
 
  public:
   void newFrame() {
+    glfwPollEvents();
     mSemaphoreIndex = (mSemaphoreIndex + 1) % mFrameSemaphores.size();
     auto result = mDevice.acquireNextImageKHR(mSwapchain.get(), UINT64_MAX,
                                               mFrameSemaphores[mSemaphoreIndex].mImageAcquiredSemaphore.get(),
@@ -75,11 +80,37 @@ class VulkanWindow {
     }
     mFrameIndex = result.value;
 
+    if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_A) + 'q' - 'a')) {
+      log::info("q pressed");
+    }
+
+    auto mousePos = ImGui::GetMousePos();
+
+    static bool firstFrame = true;
+    if (firstFrame) {
+      firstFrame = false;
+    } else {
+      mMouseDelta = {mousePos.x - mMousePos.x, mousePos.y - mMousePos.y};
+    }
+    mMousePos = mousePos;
+
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
     ImGui::Render();
+  }
+
+  bool isKeyDown(char key) {
+    return ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
+  }
+  
+  ImVec2 getMouseDelta() {
+    return mMouseDelta;
+  }
+
+  bool isMouseKeyDown(int key) {
+    return ImGui::IsMouseDown(key);
   }
 
   bool presentFrameWithImgui(vk::Queue graphicsQueue, vk::Queue presentQueue,
@@ -281,24 +312,6 @@ class VulkanWindow {
       mFrameSemaphores[i].mImguiCompleteSemaphore = mDevice.createSemaphoreUnique({});
     }
   }
-  // void recreateCommandBuffers(uint32_t queueFamily) {
-  //   // Create Command Buffers
-  //   for (uint32_t i = 0; i < mFrames.size(); i++) {
-  //     // free command buffer before command pool
-  //     mFrames[i].mCommandBuffer.reset();
-  //     mFrames[i].mCommandPool.reset();
-
-  //     mFrames[i].mCommandPool = mDevice.createCommandPoolUnique(
-  //         vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamily));
-  //     mFrames[i].mCommandBuffer = std::move(mDevice.allocateCommandBuffersUnique(
-  //         {mFrames[i].mCommandPool.get(), vk::CommandBufferLevel::ePrimary, 1}).front());
-
-  //     mFrames[i].mFence = mDevice.createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
-
-  //     mFrameSemaphores[i].mImageAcquiredSemaphore = mDevice.createSemaphoreUnique({});
-  //     mFrameSemaphores[i].mRenderCompleteSemaphore = mDevice.createSemaphoreUnique({});
-  //   }
-  // }
 };
 }
 

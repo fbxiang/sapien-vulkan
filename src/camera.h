@@ -27,4 +27,8 @@ struct Camera {
   glm::mat4 getProjectionMat() const;
 };
 
+struct FPSCamera : public Camera{
+
+};
+
 }

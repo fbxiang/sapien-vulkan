@@ -21,15 +21,18 @@ layout(location = 2) in vec2 uv;
 layout(location = 3) in vec3 tangent;
 layout(location = 4) in vec3 bitangent;
 
-layout(location = 0) out vec4 outNormal;
-layout(location = 1) out vec4 outPosition;
+layout(location = 0) out vec4 outPosition;
+layout(location = 1) out mat3 outTbn;
 
 void main() {
   mat4 modelView = cameraUBO.viewMatrix * objectUBO.modelMatrix;
-  mat4 mvp = cameraUBO.projectionMatrix * modelView;
-  mat4 normalMat = transpose(inverse(modelView));
+  mat3 normalMatrix = mat3(transpose(inverse(modelView)));
 
-  gl_Position = mvp * vec4(pos, 1);
-  outPosition = gl_Position;
-  outNormal = normalMat * vec4(normal, 0);
+  outPosition = modelView * vec4(pos, 1);
+  gl_Position = cameraUBO.projectionMatrix * outPosition;
+
+  vec3 outTangent = normalize(normalMatrix * tangent);
+  vec3 outBitangent = normalize(normalMatrix * bitangent);
+  vec3 outNormal = normalize(normalMatrix * normal);
+  outTbn = mat3(outTangent, outBitangent, outNormal);
 }

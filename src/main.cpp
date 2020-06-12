@@ -4,8 +4,9 @@
 #include "common/log.h"
 #include "pass/gbuffer.h"
 #include "camera.h"
+#include "camera_controller.h"
 
-#include "gui.hpp"
+#include "gui/gui.hpp"
 
 using namespace svulkan;
 
@@ -19,7 +20,6 @@ static void glfw_resize_callback(GLFWwindow *, int w, int h) {
   gSwapchainResizeHeight = h;
 }
 
-
 void LoadCube(VulkanContext &context, Scene &scene) {
   auto mat = context.createMaterial();
   mat->setProperties({});
@@ -32,67 +32,10 @@ void LoadCube(VulkanContext &context, Scene &scene) {
   vobj->setMesh(mesh);
   vobj->setMaterial(mat);
   auto obj = std::make_unique<Object>(std::move(vobj));
-  obj->mTransform.position = {0.5, 0, 0};
+  obj->mTransform.position = {0, 0, 0};
   obj->mTransform.scale = {0.1, 0.1, 0.2};
   scene.addObject(std::move(obj));
 }
-
-// void initImgui(VulkanContext &context, VulkanRenderer &renderer, ImGuiVulkanWindow &vulkanWindow) {
-
-//   // Create Framebuffers
-//   int w, h;
-//   glfwGetFramebufferSize(context.getWindow(), &w, &h);
-//   glfwSetFramebufferSizeCallback(context.getWindow(), glfw_resize_callback);
-//   ImGuiVulkanWindow *wd = &vulkanWindow;
-//   wd->mSurface = context.getSurface();
-
-//   // Select Surface Format
-//   std::vector<vk::Format> requestSurfaceImageFormat = {vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm,
-//                                                        vk::Format::eB8G8R8Unorm, vk::Format::eR8G8B8Unorm};
-//   const vk::ColorSpaceKHR requestSurfaceColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
-//   wd->mSurfaceFormat = SelectSurfaceFormat(context.getPhysicalDevice(), wd->mSurface, requestSurfaceImageFormat,
-//                                            requestSurfaceColorSpace);
-
-//   // Select Present Mode
-// #ifdef IMGUI_UNLIMITED_FRAME_RATE
-//   std::vector<vk::PresentModeKHR> present_modes = {vk::PresentModeKHR::eMailbox,
-//                                                    vk::PresentModeKHR::eImmediate, vk::PresentModeKHR::eFifo};
-// #else
-//   std::vector<vk::PresentModeKHR> present_modes = {vk::PresentModeKHR::eFifo};
-// #endif
-//   wd->mPresentMode = SelectPresentMode(context.getPhysicalDevice(), wd->mSurface, present_modes);
-
-//   CreateImGuiVulkanWindow(context.getInstance(), context.getPhysicalDevice(),
-//                           context.getDevice(), &vulkanWindow,
-//                           context.getGraphicsQueueFamilyIndex(), nullptr, w, h, 2);
-
-//   IMGUI_CHECKVERSION();
-//   ImGui::CreateContext();
-//   ImGuiIO &io = ImGui::GetIO();
-//   // TODO: set controls
-
-//   // ImGui::StyleColorsDark();
-
-//   ImGui_ImplGlfw_InitForVulkan(context.getWindow(), true);
-//   ImGui_ImplVulkan_InitInfo init_info = {};
-//   init_info.Instance = context.getInstance();
-//   init_info.PhysicalDevice = context.getPhysicalDevice();
-//   init_info.Device = context.getDevice();
-//   init_info.QueueFamily = context.getGraphicsQueueFamilyIndex();
-//   init_info.Queue = context.getGraphicsQueue();
-
-//   init_info.PipelineCache = VK_NULL_HANDLE;
-//   init_info.DescriptorPool = context.getDescriptorPool();
-//   init_info.Allocator = VK_NULL_HANDLE;
-//   init_info.MinImageCount = 2;
-//   init_info.ImageCount = 2;
-//   init_info.CheckVkResultFn = check_vk_result;
-//   ImGui_ImplVulkan_Init(&init_info, vulkanWindow.mRenderPass.get());
-
-//   OneTimeSubmit(context.getDevice(), context.getCommandPool(), context.getGraphicsQueue(),
-//                 [](vk::CommandBuffer cb) { ImGui_ImplVulkan_CreateFontsTexture(cb); });
-// }
-
 
 int main() {
   VulkanContext context;
@@ -102,7 +45,8 @@ int main() {
   LoadCube(context, scene);
 
   auto camera = context.createCamera();
-  camera->position = {0, 0, 3};
+  FPSCameraController cameraController(*camera, {0,0,-1}, {0,1,0});
+  cameraController.setXYZ(0, 0.3, 3);
 
   renderer->resize(800, 600);
 
@@ -120,7 +64,7 @@ int main() {
 
   vwindow.recreateSwapchain(800, 600);
   vwindow.recreateImguiResources(context.getGraphicsQueueFamilyIndex());
-
+  camera->aspect = 4.f/3.f;
   device.waitIdle();
 
   vk::UniqueSemaphore sceneRenderSemaphore = context.getDevice().createSemaphoreUnique({});
@@ -134,10 +78,6 @@ int main() {
   glfwSetWindowSizeCallback(context.getWindow(), glfw_resize_callback);
 
   while (!glfwWindowShouldClose(context.getWindow())) {
-    glfwPollEvents();
-    if (glfwGetKey(context.getWindow(), GLFW_KEY_Q)) {
-      glfwSetWindowShouldClose(context.getWindow(), true);
-    }
 
     if (gSwapchainRebuild) {
       gSwapchainRebuild = false;
@@ -146,6 +86,7 @@ int main() {
       vwindow.recreateImguiResources(context.getGraphicsQueueFamilyIndex());
       renderer->resize(vwindow.getWidth(), vwindow.getHeight());
       device.waitIdle();
+      camera->aspect = static_cast<float>(vwindow.getWidth()) / vwindow.getHeight();
       continue;
     }
 
@@ -190,6 +131,31 @@ int main() {
       gSwapchainRebuild = true;
     }
     device.waitIdle();
+
+    if (vwindow.isKeyDown('q')) {
+      glfwSetWindowShouldClose(context.getWindow(), true);
+    }
+
+    if (vwindow.isMouseKeyDown(1)) {
+      auto [x, y] = vwindow.getMouseDelta();
+      float r = 1e-3;
+      cameraController.rotate(0, -r * y, -r * x);
+    }
+
+    constexpr float r = 1e-3;
+    if (vwindow.isKeyDown('w')) {
+      cameraController.move(r, 0, 0);
+    }
+    if (vwindow.isKeyDown('s')) {
+      cameraController.move(-r, 0, 0);
+    }
+    if (vwindow.isKeyDown('a')) {
+      cameraController.move(0, r, 0);
+    }
+    if (vwindow.isKeyDown('d')) {
+      cameraController.move(0, -r, 0);
+    }
+
   }
   device.waitIdle();
 
