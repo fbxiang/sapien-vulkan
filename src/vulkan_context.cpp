@@ -1,4 +1,16 @@
 #include "vulkan_context.h"
+#include "common/vulkan.h"
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+#include "vulkan_material.h"
+#include "vulkan_object.h"
+#include "object.h"
+#include "vulkan_scene.h"
+#include <iostream>
+#include "vulkan_renderer.h"
+#include "pass/gbuffer.h"
+#include "camera.h"
 
 namespace svulkan
 {
@@ -11,6 +23,9 @@ VulkanContext::VulkanContext() {
   createWindow();
 #endif
   createCommandPool();
+  createDescriptorPool();
+
+  initializeDescriptorSetLayouts();
 }
 
 #ifdef VK_VALIDATION
@@ -44,12 +59,12 @@ void VulkanContext::createInstance() {
 #ifdef ON_SCREEN
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    mWindow = glfwCreateWindow(800, 800, "vulkan", nullptr, nullptr);
+    mWindow = glfwCreateWindow(800, 600, "vulkan", nullptr, nullptr);
 #endif
 
 #ifdef VK_VALIDATION
   if (!checkValidationLayerSupport()) {
-    throw std::runtime_error("validation layers requested, but not available!");
+    throw std::runtime_error("create instance failed: validation layers requested but not available");
   }
   std::vector<const char *> enabledLayers = {"VK_LAYER_KHRONOS_validation"};
 #else
@@ -89,7 +104,11 @@ void VulkanContext::createLogicalDevice() {
   float queuePriority = 0.0f;
   vk::DeviceQueueCreateInfo deviceQueueCreateInfo(
       vk::DeviceQueueCreateFlags(), static_cast<uint32_t>(graphicsQueueFamilyIndex), 1, &queuePriority);
+#ifdef ON_SCREEN
   std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+#else
+  std::vector<const char *> deviceExtensions = {};
+#endif
   mDevice = mPhysicalDevice.createDeviceUnique(
       vk::DeviceCreateInfo(vk::DeviceCreateFlags(), 1, &deviceQueueCreateInfo, 0, nullptr,
                            deviceExtensions.size(), deviceExtensions.data()));
@@ -99,12 +118,12 @@ void VulkanContext::createLogicalDevice() {
 void VulkanContext::createWindow() {
   VkSurfaceKHR tmpSurface;
   if (glfwCreateWindowSurface(*mInstance, mWindow, nullptr, &tmpSurface) != VK_SUCCESS) {
-    throw std::runtime_error("Create window failed: cannot create GLFW window surface");
+    throw std::runtime_error("create window failed: cannot create GLFW window surface");
   }
   mSurface = vk::UniqueSurfaceKHR(tmpSurface);
 
   if (!mPhysicalDevice.getSurfaceSupportKHR(graphicsQueueFamilyIndex, mSurface.get())) {
-    throw std::runtime_error("Create window failed: graphics device does not have present capability");
+    throw std::runtime_error("create window failed: graphics device does not have present capability");
   }
 
   presentQueueFamilyIndex = graphicsQueueFamilyIndex;
@@ -116,5 +135,243 @@ vk::Queue VulkanContext::getGraphicsQueue() const { return mDevice->getQueue(gra
 #ifdef ON_SCREEN
 vk::Queue VulkanContext::getPresentQueue() const { return mDevice->getQueue(presentQueueFamilyIndex, 0); }
 #endif
+
+void VulkanContext::createCommandPool() {
+  mCommandPool = mDevice->createCommandPoolUnique(
+      vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, graphicsQueueFamilyIndex));
+}
+
+void VulkanContext::createDescriptorPool() {
+  constexpr uint32_t numMaterials = 100;
+  constexpr uint32_t numTextures = 100;
+  mDescriptorPool = svulkan::createDescriptorPool(mDevice.get(), {
+      // {vk::DescriptorType::eUniformBuffer, numMaterials},
+      // {vk::DescriptorType::eCombinedImageSampler, numTextures},
+      { vk::DescriptorType::eSampler, 1000 },
+      { vk::DescriptorType::eCombinedImageSampler, 1000 },
+      { vk::DescriptorType::eSampledImage, 1000 },
+      { vk::DescriptorType::eStorageImage, 1000 },
+      { vk::DescriptorType::eUniformTexelBuffer, 1000 },
+      { vk::DescriptorType::eStorageTexelBuffer, 1000 },
+      { vk::DescriptorType::eUniformBuffer, 1000 },
+      { vk::DescriptorType::eStorageBuffer, 1000 },
+      { vk::DescriptorType::eUniformBufferDynamic, 1000 },
+      { vk::DescriptorType::eStorageBufferDynamic, 1000 },
+      { vk::DescriptorType::eInputAttachment, 1000 }
+    });
+}
+
+void VulkanContext::initializeDescriptorSetLayouts() {
+  mDescriptorSetLayouts.scene = 
+      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
+            1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
+
+  mDescriptorSetLayouts.camera = 
+      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
+            1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
+
+  mDescriptorSetLayouts.object = 
+      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
+            1, vk::ShaderStageFlagBits::eVertex}});
+
+  mDescriptorSetLayouts.material = 
+      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
+            1,  vk::ShaderStageFlagBits::eFragment}});
+}
+
+
+
+static float shininessToRoughness(float ns) {
+  if (ns <= 5.f) {
+    return 1.f;
+  }
+  if (ns >= 1605.f) {
+    return 0.f;
+  }
+  return 1.f - (std::sqrt(ns - 5.f) * 0.025f);
+}
+
+std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string const &file, float scale,
+                                                 bool ignoreRootTransform,
+                                                 glm::vec3 const &up, glm::vec3 const &forward) {
+  glm::mat3 formatTransform = glm::mat3(glm::cross(forward, up), up, -forward);
+  std::vector<std::unique_ptr<Object>> objects;
+  Assimp::Importer importer;
+  uint32_t flags = aiProcess_CalcTangentSpace | aiProcess_Triangulate |
+                   aiProcess_GenNormals | aiProcess_FlipUVs | aiProcess_PreTransformVertices;
+  const aiScene *scene = importer.ReadFile(file, flags);
+  if (scene->mRootNode->mMetaData) {
+    throw std::runtime_error("Failed to load scene: metadata is not supported, " + file);
+  }
+  if (!scene) {
+    throw std::runtime_error("Failed to load scene: " + std::string(importer.GetErrorString()) + ", " + file);
+  }
+
+  printf("Loaded %d meshes, %d materials, %d textures\n", scene->mNumMeshes, scene->mNumMaterials,
+         scene->mNumTextures);
+  std::vector<std::shared_ptr<VulkanMaterial>> mats;
+  for (uint32_t i = 0; i < scene->mNumMaterials; i++) {
+    std::shared_ptr<VulkanMaterial> mat = std::make_shared<VulkanMaterial>(
+        mPhysicalDevice, mDevice.get(), mDescriptorPool.get(),
+        mDescriptorSetLayouts.material.get());
+    auto *m = scene->mMaterials[i];
+    PBRMaterialUBO matSpec;
+
+    aiColor3D color{0,0,0};
+    float alpha = 1.f;
+    float shininess = 0.f;
+    m->Get(AI_MATKEY_OPACITY, alpha);
+    m->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    matSpec.baseColor = {color.r, color.g, color.b, alpha};
+
+    m->Get(AI_MATKEY_COLOR_SPECULAR, color);
+    matSpec.specular = (color.r + color.g + color.b) / 3.f;
+
+    m->Get(AI_MATKEY_SHININESS, shininess);
+    matSpec.roughness = shininessToRoughness(shininess);
+
+    std::string parentdir = file.substr(0, file.find_last_of('/')) + "/";
+
+    // aiString path;
+    // if (m->GetTextureCount(aiTextureType_DIFFUSE) > 0 &&
+    //     m->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS) {
+    //   std::string p = std::string(path.C_Str());
+    //   std::string fullPath = parentdir + p;
+
+    //   auto tex = LoadTexture(fullPath, 0);
+    //   pbrMats[i]->kd_map = tex;
+    //   logger->info("{}: Diffuse texture {}", tex->getId(), fullPath);
+
+    //   auto err = glGetError();
+    //   if (err != GL_NO_ERROR) {
+    //     logger->critical("Loading failed: {0:x}", err);
+    //     throw std::runtime_error("Loading failed");
+    //   }
+    // }
+
+    // if (m->GetTextureCount(aiTextureType_SPECULAR) > 0 &&
+    //     m->GetTexture(aiTextureType_SPECULAR, 0, &path) == AI_SUCCESS) {
+    //   std::string p = std::string(path.C_Str());
+    //   std::string fullPath = parentdir + p;
+
+    //   auto tex = LoadTexture(fullPath, 0);
+    //   logger->info("{}: Specular texture {}", tex->getId(), fullPath);
+    //   auto err = glGetError();
+    //   if (err != GL_NO_ERROR) {
+    //     logger->critical("Loading failed: {0:x}", err);
+    //     throw std::runtime_error("Loading failed");
+    //   }
+    // }
+
+    // if (m->GetTextureCount(aiTextureType_HEIGHT) > 0 &&
+    //     m->GetTexture(aiTextureType_HEIGHT, 0, &path) == AI_SUCCESS) {
+    //   std::string p = std::string(path.C_Str());
+    //   std::string fullPath = parentdir + p;
+
+    //   auto tex = LoadTexture(fullPath, 0);
+    //   pbrMats[i]->height_map = tex;
+    //   logger->info("{}: Height texture {}", tex->getId(), fullPath);
+    //   auto err = glGetError();
+    //   if (err != GL_NO_ERROR) {
+    //     logger->critical("Loading failed: {0:x}", err);
+    //     throw std::runtime_error("Loading failed");
+    //   }
+    // }
+
+    // if (m->GetTextureCount(aiTextureType_NORMALS) > 0 &&
+    //     m->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS) {
+    //   std::string p = std::string(path.C_Str());
+    //   std::string fullPath = parentdir + p;
+
+    //   auto tex = LoadTexture(fullPath, 0);
+    //   pbrMats[i]->normal_map = tex;
+    //   logger->info("{}: Normal texture {}", tex->getId(), fullPath);
+    //   auto err = glGetError();
+    //   if (err != GL_NO_ERROR) {
+    //     logger->critical("Loading failed: {0:x}", err);
+    //     throw std::runtime_error("Loading failed");
+    //   }
+    // }
+    mat->setProperties(matSpec);
+    mats.push_back(mat);
+  }
+
+  for (uint32_t i = 0; i < scene->mNumMeshes; i++) {
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    auto mesh = scene->mMeshes[i];
+    if (!mesh->HasFaces())
+      continue;
+
+    for (uint32_t v = 0; v < mesh->mNumVertices; v++) {
+      glm::vec3 normal = glm::vec3(0);
+      glm::vec2 texcoord = glm::vec2(0);
+      glm::vec3 position = formatTransform *
+                           glm::vec3(mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z) * scale;
+      glm::vec3 tangent = glm::vec3(0);
+      glm::vec3 bitangent = glm::vec3(0);
+      if (mesh->HasNormals()) {
+        normal = formatTransform * glm::vec3(mesh->mNormals[v].x, mesh->mNormals[v].y, mesh->mNormals[v].z);
+      }
+      if (mesh->HasTextureCoords(0)) {
+        texcoord = {mesh->mTextureCoords[0][v].x, mesh->mTextureCoords[0][v].y};
+      }
+      if (mesh->HasTangentsAndBitangents()) {
+        tangent =
+            formatTransform * glm::vec3(mesh->mTangents[v].x, mesh->mTangents[v].y, mesh->mTangents[v].z);
+        bitangent = formatTransform *
+                    glm::vec3(mesh->mBitangents[v].x, mesh->mBitangents[v].y, mesh->mBitangents[v].z);
+      }
+      vertices.push_back({position, normal, texcoord, tangent, bitangent});
+    }
+    for (uint32_t f = 0; f < mesh->mNumFaces; f++) {
+      auto face = mesh->mFaces[f];
+      if (face.mNumIndices != 3) {
+        fprintf(stderr, "A face with %d indices is found and ignored.", face.mNumIndices);
+        continue;
+      }
+      indices.push_back(face.mIndices[0]);
+      indices.push_back(face.mIndices[1]);
+      indices.push_back(face.mIndices[2]);
+    }
+
+    std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
+        getPhysicalDevice(), getDevice(), mCommandPool.get(),
+        getGraphicsQueue(), vertices, indices, !mesh->HasNormals());
+
+    std::unique_ptr<VulkanObject> vobj =
+        std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
+                                       mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+    vobj->setMesh(vulkanMesh);
+    vobj->setMaterial(mats[mesh->mMaterialIndex]);
+    std::unique_ptr<Object> object = std::make_unique<Object>(std::move(vobj));
+    objects.push_back(std::move(object));
+  }
+  return objects;
+}
+
+std::shared_ptr<VulkanMaterial> VulkanContext::createMaterial() const {
+  return std::make_shared<VulkanMaterial>(
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.material.get());
+}
+
+std::unique_ptr<VulkanScene> VulkanContext::createVulkanScene() const {
+  return std::make_unique<VulkanScene>(
+      getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().scene.get());
+}
+
+std::unique_ptr<VulkanObject> VulkanContext::createVulkanObject() const {
+  return std::make_unique<VulkanObject>(
+      getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().object.get());
+}
+
+std::unique_ptr<VulkanRenderer> VulkanContext::createVulkanRenderer() {
+  return std::make_unique<VulkanRenderer>(*this);
+}
+
+std::unique_ptr<struct Camera> VulkanContext::createCamera() const {
+  return std::make_unique<Camera>(
+      getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().camera.get());
+}
 
 }

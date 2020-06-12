@@ -46,16 +46,6 @@ void OneTimeSubmitNoWait(vk::CommandBuffer commandBuffer, vk::Queue queue, Func 
 }
 
 template <typename Func>
-void OneTimeSubmitNoWait(vk::Device device, vk::CommandPool commandPool, vk::Queue queue, Func const &func) {
-  vk::UniqueCommandBuffer commandBuffer =
-      std::move(device
-                .allocateCommandBuffersUnique(
-                    vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, 1))
-                .front());
-  oneTimeSubmitNoWait(commandBuffer.get(), queue, func);
-}
-
-template <typename Func>
 void OneTimeSubmit(vk::CommandBuffer commandBuffer, vk::Queue queue, Func const &func) {
   OneTimeSubmitNoWait(commandBuffer, queue, func);
   queue.waitIdle();
@@ -63,7 +53,12 @@ void OneTimeSubmit(vk::CommandBuffer commandBuffer, vk::Queue queue, Func const 
 
 template <typename Func>
 void OneTimeSubmit(vk::Device device, vk::CommandPool commandPool, vk::Queue queue, Func const &func) {
-  OneTimeSubmitNoWait(device, commandPool, queue, func);
+  vk::UniqueCommandBuffer commandBuffer =
+      std::move(device
+                .allocateCommandBuffersUnique(
+                    vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, 1))
+                .front());
+  OneTimeSubmitNoWait(commandBuffer.get(), queue, func);
   queue.waitIdle();
 }
 
@@ -87,5 +82,12 @@ vk::UniqueDescriptorSetLayout createDescriptorSetLayout(
     vk::Device device,
     std::vector<std::tuple<vk::DescriptorType, uint32_t, vk::ShaderStageFlags>> const &bindingData,
     vk::DescriptorSetLayoutCreateFlags flags = {}); 
+
+vk::UniqueDescriptorPool createDescriptorPool(vk::Device device,
+                                              std::vector<vk::DescriptorPoolSize> const &poolSizes);
+
+vk::UniqueFramebuffer createFramebuffer(vk::Device device, vk::RenderPass renderPass,
+                                        std::vector<vk::ImageView> const&colorImageViews,
+                                        vk::ImageView depthImageView, vk::Extent2D const&extent);
 
 }

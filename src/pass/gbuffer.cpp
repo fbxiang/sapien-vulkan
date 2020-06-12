@@ -126,23 +126,27 @@ GBufferPass::GBufferPass(VulkanContext &context): mContext(&context) {}
 
 void GBufferPass::initializePipeline(
     std::vector<vk::DescriptorSetLayout> const &layouts,
-    std::vector<vk::Format> colorFormats,
+    std::vector<vk::Format> const &colorFormats,
+    vk::Format depthFormat,
     vk::CullModeFlags cullMode,
     vk::FrontFace frontFace) {
   // contains information about what buffers 
-  auto pipelineLayout = mContext->getDevice().createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo(
+  mPipelineLayout = mContext->getDevice().createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo(
       vk::PipelineLayoutCreateFlags(), layouts.size(), layouts.data()));
 
-  // std::vector<vk::Format> colorFormats = {
-  //   vk::Format::eR8G8B8A8Unorm,  // color
-  //   vk::Format::eR8G8B8A8Unorm,  // specular
-  //   vk::Format::eR8G8B8A8Unorm   // normal
-  // };
-
-  mRenderPass = createRenderPass(mContext->getDevice(), colorFormats, vk::Format::eD32Sfloat);
+  mRenderPass = createRenderPass(mContext->getDevice(), colorFormats, depthFormat,
+                                 vk::AttachmentLoadOp::eClear);
   mPipeline = createGraphicsPipeline(mContext->getDevice(), colorFormats.size(),
-                                     cullMode, frontFace, pipelineLayout.get(), mRenderPass.get());
+                                     cullMode, frontFace, mPipelineLayout.get(), mRenderPass.get());
 
 }
 
+void GBufferPass::initializeFramebuffer(std::vector<vk::ImageView> const& colorImageViews,
+                                        vk::ImageView depthImageView,
+                                        vk::Extent2D const &extent) {
+  mFramebuffer = createFramebuffer(
+      mContext->getDevice(), mRenderPass.get(), colorImageViews, depthImageView, extent);
 }
+
+}
+

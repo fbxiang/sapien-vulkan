@@ -1,6 +1,7 @@
 #include "vulkan_util.h"
 #include "fs.h"
 #include "vulkan_texture.h"
+#include <numeric>
 
 namespace svulkan {
 static uint32_t findMemoryType(vk::PhysicalDeviceMemoryProperties const &memoryProperties, uint32_t typeBits,
@@ -16,15 +17,19 @@ static uint32_t findMemoryType(vk::PhysicalDeviceMemoryProperties const &memoryP
   }
   if (typeIndex != ~0u)
     return typeIndex;
-  throw std::runtime_error("No memory type found!");
+  throw std::runtime_error("find memory failed: no memory type exists");
 }
 
 vk::UniqueShaderModule createShaderModule(vk::Device device, const std::string &filename) {
-  auto code = readFile(filename);
+  std::vector<char> code = readFile(filename);
+  assert(code.size() % sizeof(uint32_t) == 0);
+  std::vector<uint32_t> shaderCode(code.size() / sizeof(uint32_t));
+  std::memcpy(shaderCode.data(), code.data(), shaderCode.size() * sizeof(uint32_t));
+
   return device.createShaderModuleUnique(
       vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),
                                  code.size(),
-                                 reinterpret_cast<uint32_t*>(code.data())));
+                                 shaderCode.data()));
 }
 
 vk::UniqueDeviceMemory allocateMemory(vk::Device device,
@@ -103,6 +108,32 @@ vk::UniqueDescriptorSetLayout createDescriptorSetLayout(
   }
   return device.createDescriptorSetLayoutUnique(
       vk::DescriptorSetLayoutCreateInfo(flags, static_cast<uint32_t>(bindings.size()), bindings.data()));
+}
+
+vk::UniqueDescriptorPool createDescriptorPool(vk::Device device,
+                                              std::vector<vk::DescriptorPoolSize> const &poolSizes) {
+  assert(!poolSizes.empty());
+  uint32_t maxSets = std::accumulate(
+      poolSizes.begin(), poolSizes.end(), 0,
+      [](uint32_t sum, vk::DescriptorPoolSize const &dps) { return sum + dps.descriptorCount; });
+  assert(maxSets > 0);
+
+  vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+                                                        maxSets, static_cast<uint32_t>(poolSizes.size()),
+                                                        poolSizes.data());
+  return device.createDescriptorPoolUnique(descriptorPoolCreateInfo);
+}
+
+vk::UniqueFramebuffer createFramebuffer(vk::Device device, vk::RenderPass renderPass,
+                                        std::vector<vk::ImageView> const&colorImageViews,
+                                        vk::ImageView depthImageView, vk::Extent2D const&extent) {
+  std::vector<vk::ImageView> imageViews = colorImageViews;
+  if (depthImageView) {
+    imageViews.push_back(depthImageView);
+  }
+  vk::FramebufferCreateInfo info({}, renderPass, imageViews.size(), imageViews.data(),
+                                 extent.width, extent.height, 1);
+  return device.createFramebufferUnique(info);
 }
 
 }

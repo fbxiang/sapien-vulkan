@@ -12,6 +12,9 @@ struct VulkanBufferData {
                    vk::MemoryPropertyFlags propertyFlags = vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent);
 
+  inline vk::Buffer getBuffer() const { return mBuffer.get(); }
+  inline vk::DeviceMemory getMemory() const { return mMemory.get(); }
+
 
   /** Upload data to Vulkan buffer */
   template <typename DataType> void upload(vk::Device device, DataType const &data) const {
@@ -40,8 +43,8 @@ struct VulkanBufferData {
 
   /** Upload with staging buffer */
   template <typename DataType>
-  void uploadNoWait(vk::PhysicalDevice physicalDevice, vk::Device device, vk::CommandPool commandPool,
-              vk::Queue queue, std::vector<DataType> const &data, size_t stride) const {
+  void uploadNoWait(vk::PhysicalDevice physicalDevice, vk::Device device, vk::CommandBuffer commandBuffer,
+                    vk::Queue queue, std::vector<DataType> const &data, size_t stride) const {
 #if !defined(NDEBUG)
     assert(m_usage & vk::BufferUsageFlagBits::eTransferDst);
     assert(m_propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal);
@@ -55,7 +58,7 @@ struct VulkanBufferData {
     VulkanBufferData stagingBuffer(physicalDevice, device, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
     copyToDevice<DataType>(device, stagingBuffer.mMemory.get(), data.data(), data.size(), elementSize);
 
-    OneTimeSubmitNoWait(device, commandPool, queue, [&](vk::CommandBuffer commandBuffer) {
+    OneTimeSubmitNoWait(commandBuffer, queue, [&](vk::CommandBuffer commandBuffer) {
       commandBuffer.copyBuffer(*stagingBuffer.mBuffer, *mBuffer, vk::BufferCopy(0, 0, dataSize));
     });
   }
@@ -77,7 +80,7 @@ struct VulkanBufferData {
     VulkanBufferData stagingBuffer(physicalDevice, device, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
     copyToDevice<DataType>(device, stagingBuffer.mMemory.get(), data.data(), data.size(), elementSize);
 
-    oneTimeSubmit(device, commandPool, queue, [&](vk::CommandBuffer commandBuffer) {
+    OneTimeSubmit(device, commandPool, queue, [&](vk::CommandBuffer commandBuffer) {
       commandBuffer.copyBuffer(*stagingBuffer.mBuffer, *mBuffer, vk::BufferCopy(0, 0, dataSize));
     });
   }

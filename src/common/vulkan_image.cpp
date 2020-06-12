@@ -25,7 +25,8 @@ VulkanImageData::VulkanImageData(vk::PhysicalDevice physicalDevice, vk::Device d
   vk::ImageViewCreateInfo imageViewInfo(vk::ImageViewCreateFlags(), mImage.get(), vk::ImageViewType::e2D,
                                         mFormat, componentMapping,
                                         vk::ImageSubresourceRange(aspectMask, 0, mipLevels, 0, 1));
-  
+
+  mImageView = device.createImageViewUnique(imageViewInfo);
 }
 
 }

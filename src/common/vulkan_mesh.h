@@ -27,6 +27,8 @@ struct Vertex {
     };
     return v;
   }
+
+  Vertex(glm::vec3 p, glm::vec3 n = {0,0,0}, glm::vec2 u={0,0}, glm::vec3 t={0,0,0}, glm::vec3 b = {0,0,0});
 };
 
 struct VulkanMesh {
@@ -46,5 +48,10 @@ struct VulkanMesh {
   VulkanMesh &operator=(VulkanMesh const &other) = delete;
   VulkanMesh &operator=(VulkanMesh &&other) = default;
   ~VulkanMesh() = default;
+
+  static std::shared_ptr<VulkanMesh> CreateCube(vk::PhysicalDevice physicalDevice, vk::Device device,
+                                                vk::CommandPool commandPool, vk::Queue queue); 
+
 };
+
 }

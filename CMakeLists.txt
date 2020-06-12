@@ -12,15 +12,15 @@ set(ON_SCREEN TRUE CACHE BOOL "Build with on screen rendering support")
 
 add_definitions(-DVK_VALIDATION)
 include_directories("src")
+include_directories("3rd_party/glfw/include")
 
 if (${ON_SCREEN}) 
+    add_subdirectory("3rd_party/glfw")
     add_definitions(-DON_SCREEN)
-    find_package(glfw3 REQUIRED)
-    include_directories("3rdparty/imgui" "3rdparty/imgui/examples")
-    include_directories("3rdparty/imgui" "3rdparty/imgui/examples")
-    file(GLOB GUI_SRC "3rdparty/imgui/*.cpp"
-        "3rdparty/imgui/examples/imgui_impl_glfw.cpp"
-        "3rdparty/imgui/examples/imgui_impl_vulkan.cpp" )
+    include_directories("3rd_party/imgui" "3rd_party/imgui/examples")
+    file(GLOB GUI_SRC "3rd_party/imgui/*.cpp"
+        "3rd_party/imgui/examples/imgui_impl_glfw.cpp"
+        "3rd_party/imgui/examples/imgui_impl_vulkan.cpp" )
 endif()
 
 

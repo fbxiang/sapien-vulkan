@@ -5,12 +5,6 @@
 namespace svulkan
 {
 
-struct ObjectUBO {
-  glm::mat4 modelMatrix;
-  glm::uvec4 segmentation;
-};
-
-
 struct VulkanObject {
   vk::Device mDevice;
   std::shared_ptr<VulkanMesh> mMesh = nullptr;

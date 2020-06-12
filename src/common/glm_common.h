@@ -6,3 +6,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+struct Transform {
+  glm::vec3 position = {0, 0, 0};
+  glm::quat rotation = glm::quat(1, 0, 0, 0);
+  glm::vec3 scale = {1, 1, 1};
+};
