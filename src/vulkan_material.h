@@ -11,14 +11,22 @@ struct VulkanMaterial {
   vk::Device mDevice;
 
   VulkanMaterial(vk::PhysicalDevice physicalDevice, vk::Device device,
-                 vk::DescriptorPool descriptorPool, vk::DescriptorSetLayout descriptorLayout);
+                 vk::DescriptorPool descriptorPool, vk::DescriptorSetLayout descriptorLayout,
+                 std::shared_ptr<VulkanTextureData> defaultTexture);
   void setProperties(PBRMaterialUBO const &data);
   VulkanBufferData mUBO;
   vk::UniqueDescriptorSet mDescriptorSet;
   
-  VulkanTextureData *mDiffuseMap;
-  VulkanTextureData *mSpecularMap;
-  VulkanTextureData *mNormalMap;
+  std::shared_ptr<VulkanTextureData> mDiffuseMap;
+  std::shared_ptr<VulkanTextureData> mSpecularMap;
+  std::shared_ptr<VulkanTextureData> mNormalMap;
+  std::shared_ptr<VulkanTextureData> mHeightMap;
+
+  void updateDescriptorSets();
+
+#if !defined(NDEBUG)
+  bool mInitialized = false;
+#endif
 };
 
 }

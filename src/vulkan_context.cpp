@@ -11,6 +11,10 @@
 #include "vulkan_renderer.h"
 #include "pass/gbuffer.h"
 #include "camera.h"
+#include "common/vulkan_texture.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "common/stb_image.h"
 
 namespace svulkan
 {
@@ -142,8 +146,8 @@ void VulkanContext::createCommandPool() {
 }
 
 void VulkanContext::createDescriptorPool() {
-  constexpr uint32_t numMaterials = 100;
-  constexpr uint32_t numTextures = 100;
+  // constexpr uint32_t numMaterials = 100;
+  // constexpr uint32_t numTextures = 100;
   mDescriptorPool = svulkan::createDescriptorPool(mDevice.get(), {
       // {vk::DescriptorType::eUniformBuffer, numMaterials},
       // {vk::DescriptorType::eCombinedImageSampler, numTextures},
@@ -162,6 +166,7 @@ void VulkanContext::createDescriptorPool() {
 }
 
 void VulkanContext::initializeDescriptorSetLayouts() {
+  // uniform buffers
   mDescriptorSetLayouts.scene = 
       createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
             1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
@@ -175,11 +180,43 @@ void VulkanContext::initializeDescriptorSetLayouts() {
             1, vk::ShaderStageFlagBits::eVertex}});
 
   mDescriptorSetLayouts.material = 
-      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
-            1,  vk::ShaderStageFlagBits::eFragment}});
+      createDescriptorSetLayout(
+          getDevice(),
+          {{vk::DescriptorType::eUniformBuffer, 1,  vk::ShaderStageFlagBits::eFragment},
+           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}
+          });
 }
 
+std::shared_ptr<VulkanTextureData> VulkanContext::getPlaceholderTexture() {
+  if (!mPlaceholderTexture) {
+    mPlaceholderTexture = std::make_shared<VulkanTextureData>(
+        getPhysicalDevice(), getDevice(), vk::Extent2D{64u, 64u});
+    // char zeros[4] = {0,0,0,0};
+    mPlaceholderTexture->setImage(getPhysicalDevice(), getDevice(), getCommandPool(), getGraphicsQueue(),
+                                  [&](void *target, vk::Extent2D const &extent) {
+                                    // memcpy(target, zeros, 4);
+                                  });
+  }
+  return mPlaceholderTexture;
+}
 
+std::shared_ptr<struct VulkanTextureData> VulkanContext::loadTexture(std::string const &filename) const {
+  int width, height, nrChannels;
+  unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrChannels, STBI_rgb_alpha);
+  auto texture = std::make_shared<VulkanTextureData>(
+      getPhysicalDevice(), getDevice(),
+      vk::Extent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)});
+
+  texture->setImage(getPhysicalDevice(), getDevice(), getCommandPool(), getGraphicsQueue(),
+                    [&](void *target, vk::Extent2D const &extent) {
+                      memcpy(target, data, extent.width * extent.height * 4);
+                    });
+  stbi_image_free(data);
+  return texture;
+}
 
 static float shininessToRoughness(float ns) {
   if (ns <= 5.f) {
@@ -211,9 +248,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
          scene->mNumTextures);
   std::vector<std::shared_ptr<VulkanMaterial>> mats;
   for (uint32_t i = 0; i < scene->mNumMaterials; i++) {
-    std::shared_ptr<VulkanMaterial> mat = std::make_shared<VulkanMaterial>(
-        mPhysicalDevice, mDevice.get(), mDescriptorPool.get(),
-        mDescriptorSetLayouts.material.get());
+    std::shared_ptr<VulkanMaterial> mat = createMaterial();
     auto *m = scene->mMaterials[i];
     PBRMaterialUBO matSpec;
 
@@ -232,66 +267,48 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
 
     std::string parentdir = file.substr(0, file.find_last_of('/')) + "/";
 
-    // aiString path;
-    // if (m->GetTextureCount(aiTextureType_DIFFUSE) > 0 &&
-    //     m->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS) {
-    //   std::string p = std::string(path.C_Str());
-    //   std::string fullPath = parentdir + p;
+    aiString path;
+    if (m->GetTextureCount(aiTextureType_DIFFUSE) > 0 &&
+        m->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS) {
+      std::string p = std::string(path.C_Str());
+      std::string fullPath = parentdir + p;
 
-    //   auto tex = LoadTexture(fullPath, 0);
-    //   pbrMats[i]->kd_map = tex;
-    //   logger->info("{}: Diffuse texture {}", tex->getId(), fullPath);
+      mat->mDiffuseMap = loadTexture(fullPath);
+      matSpec.hasColorMap = 1;
+      log::info("Color texture loaded: {}", fullPath);
+    }
 
-    //   auto err = glGetError();
-    //   if (err != GL_NO_ERROR) {
-    //     logger->critical("Loading failed: {0:x}", err);
-    //     throw std::runtime_error("Loading failed");
-    //   }
-    // }
+    if (m->GetTextureCount(aiTextureType_SPECULAR) > 0 &&
+        m->GetTexture(aiTextureType_SPECULAR, 0, &path) == AI_SUCCESS) {
+      std::string p = std::string(path.C_Str());
+      std::string fullPath = parentdir + p;
 
-    // if (m->GetTextureCount(aiTextureType_SPECULAR) > 0 &&
-    //     m->GetTexture(aiTextureType_SPECULAR, 0, &path) == AI_SUCCESS) {
-    //   std::string p = std::string(path.C_Str());
-    //   std::string fullPath = parentdir + p;
+      mat->mSpecularMap = loadTexture(fullPath);
+      matSpec.hasSpecularMap = 1;
+      log::info("Specular texture loaded: {}", fullPath);
+    }
 
-    //   auto tex = LoadTexture(fullPath, 0);
-    //   logger->info("{}: Specular texture {}", tex->getId(), fullPath);
-    //   auto err = glGetError();
-    //   if (err != GL_NO_ERROR) {
-    //     logger->critical("Loading failed: {0:x}", err);
-    //     throw std::runtime_error("Loading failed");
-    //   }
-    // }
+    if (m->GetTextureCount(aiTextureType_NORMALS) > 0 &&
+        m->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS) {
+      std::string p = std::string(path.C_Str());
+      std::string fullPath = parentdir + p;
 
-    // if (m->GetTextureCount(aiTextureType_HEIGHT) > 0 &&
-    //     m->GetTexture(aiTextureType_HEIGHT, 0, &path) == AI_SUCCESS) {
-    //   std::string p = std::string(path.C_Str());
-    //   std::string fullPath = parentdir + p;
+      mat->mNormalMap = loadTexture(fullPath);
+      matSpec.hasNormalMap = 1;
+      log::info("Normal texture loaded: {}", fullPath);
+    }
 
-    //   auto tex = LoadTexture(fullPath, 0);
-    //   pbrMats[i]->height_map = tex;
-    //   logger->info("{}: Height texture {}", tex->getId(), fullPath);
-    //   auto err = glGetError();
-    //   if (err != GL_NO_ERROR) {
-    //     logger->critical("Loading failed: {0:x}", err);
-    //     throw std::runtime_error("Loading failed");
-    //   }
-    // }
+    if (m->GetTextureCount(aiTextureType_HEIGHT) > 0 &&
+        m->GetTexture(aiTextureType_HEIGHT, 0, &path) == AI_SUCCESS) {
+      std::string p = std::string(path.C_Str());
+      std::string fullPath = parentdir + p;
 
-    // if (m->GetTextureCount(aiTextureType_NORMALS) > 0 &&
-    //     m->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS) {
-    //   std::string p = std::string(path.C_Str());
-    //   std::string fullPath = parentdir + p;
+      mat->mHeightMap = loadTexture(fullPath);
+      matSpec.hasHeightMap = 1;
+      log::info("Height texture loaded: {}", fullPath);
+    }
 
-    //   auto tex = LoadTexture(fullPath, 0);
-    //   pbrMats[i]->normal_map = tex;
-    //   logger->info("{}: Normal texture {}", tex->getId(), fullPath);
-    //   auto err = glGetError();
-    //   if (err != GL_NO_ERROR) {
-    //     logger->critical("Loading failed: {0:x}", err);
-    //     throw std::runtime_error("Loading failed");
-    //   }
-    // }
+    mat->updateDescriptorSets();
     mat->setProperties(matSpec);
     mats.push_back(mat);
   }
@@ -350,9 +367,10 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
   return objects;
 }
 
-std::shared_ptr<VulkanMaterial> VulkanContext::createMaterial() const {
+std::shared_ptr<VulkanMaterial> VulkanContext::createMaterial() {
   return std::make_shared<VulkanMaterial>(
-      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.material.get());
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.material.get(),
+      getPlaceholderTexture());
 }
 
 std::unique_ptr<VulkanScene> VulkanContext::createVulkanScene() const {

@@ -11,13 +11,16 @@ struct VulkanTextureData {
   vk::UniqueSampler mTextureSampler;
 
   VulkanTextureData(vk::PhysicalDevice physicalDevice, vk::Device device, const vk::Extent2D &extent,
-                    vk::ImageTiling tiling = vk::ImageTiling::eLinear, vk::ImageUsageFlags usage = {},
+                    vk::ImageTiling tiling = vk::ImageTiling::eLinear,
+                    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eTransferDst |
+                    vk::ImageUsageFlagBits::eSampled,
                     vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-                    vk::FormatFeatureFlags formatFeatureFlags = {}, bool anisotropyEnable = false);
+                    bool anisotropyEnable = false);
 
-  template <typename ImageGenerator>
-  void setImage(vk::PhysicalDevice physicalDevice, vk::Device device, vk::CommandBuffer commandBuffer,
-                const ImageGenerator &imageGenerator) {
+  // template <typename ImageGenerator>
+  inline void setImage(vk::PhysicalDevice physicalDevice, vk::Device device,
+                       vk::CommandPool commandPool, vk::Queue queue,
+                       std::function<void(void*,vk::Extent2D const&extent)> imageGenerator) {
 
     VkDeviceSize dataSize = device.getImageMemoryRequirements(*mImageData->mImage).size;
     VulkanBufferData stagingBuffer(physicalDevice, device, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
@@ -25,28 +28,30 @@ struct VulkanTextureData {
     imageGenerator(data, mExtent);
     device.unmapMemory(*stagingBuffer.mMemory);
 
-    transitionImageLayout(commandBuffer, mImageData->mImage.get(), mFormat,
-                          vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
-                          vk::AccessFlags(), vk::AccessFlagBits::eTransferWrite,
-                          vk::PipelineStageFlagBits::eTopOfPipe,
-                          vk::PipelineStageFlagBits::eTransfer,
-                          vk::ImageAspectFlagBits::eColor, 1);
+    OneTimeSubmit(device, commandPool, queue, [&](vk::CommandBuffer commandBuffer) {
+      transitionImageLayout(commandBuffer, mImageData->mImage.get(), mFormat,
+                            vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
+                            {}, vk::AccessFlagBits::eTransferWrite,
+                            vk::PipelineStageFlagBits::eTopOfPipe,
+                            vk::PipelineStageFlagBits::eTransfer,
+                            vk::ImageAspectFlagBits::eColor, 1);
 
-    vk::BufferImageCopy copyRegion(0, mExtent.width, mExtent.height,
-                                   vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-                                   vk::Offset3D(0, 0, 0), vk::Extent3D(mExtent, 1));
+      vk::BufferImageCopy copyRegion(0, mExtent.width, mExtent.height,
+                                     vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
+                                     vk::Offset3D(0, 0, 0), vk::Extent3D(mExtent, 1));
 
-    commandBuffer.copyBufferToImage(*stagingBuffer.mBuffer, *mImageData->mImage,
-                                    vk::ImageLayout::eTransferDstOptimal, copyRegion);
+      commandBuffer.copyBufferToImage(*stagingBuffer.mBuffer, *mImageData->mImage,
+                                      vk::ImageLayout::eTransferDstOptimal, copyRegion);
 
 
-    transitionImageLayout(commandBuffer, mImageData->mImage.get(), mFormat,
-                          vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-                          vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead,
-                          vk::PipelineStageFlagBits::eTransfer,
-                          vk::PipelineStageFlagBits::eFragmentShader,
-                          vk::ImageAspectFlagBits::eColor, 1);
-  }
+      transitionImageLayout(commandBuffer, mImageData->mImage.get(), mFormat,
+                            vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+                            vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead,
+                            vk::PipelineStageFlagBits::eTransfer,
+                            vk::PipelineStageFlagBits::eFragmentShader,
+                            vk::ImageAspectFlagBits::eColor, 1);
+    });
+}
 
 };
 

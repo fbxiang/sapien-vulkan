@@ -185,9 +185,9 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
     if (vobj) {
       commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
                                        2, vobj->mDescriptorSet.get(), nullptr);
-      
       commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
                                        3, vobj->mMaterial->mDescriptorSet.get(), nullptr);
+
       commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
       commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0, vk::IndexType::eUint32);
       commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);

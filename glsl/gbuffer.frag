@@ -1,13 +1,21 @@
 #version 450
 
-layout(binding = 0, set = 3) uniform MaterialUBO {
+layout(set = 3, binding = 0) uniform MaterialUBO {
   vec4 baseColor;  // rgba
   float specular;
   float roughness;
   float metallic;
   float transparency;
+  int hasColorTexture;
+  int hasSpecularTexture;
+  int hasNormalTexture;
+  int hasHeightTexture;
 } materialUBO;
 
+layout(set = 3, binding = 1) uniform sampler2D colorTexture;
+layout(set = 3, binding = 2) uniform sampler2D specularTexture;
+layout(set = 3, binding = 3) uniform sampler2D normalTexture;
+layout(set = 3, binding = 4) uniform sampler2D heightTexture;
 
 // struct PointLight {
 //   vec4 position;

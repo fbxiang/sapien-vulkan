@@ -72,7 +72,7 @@ void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::Image image, vk:
 void updateDescriptorSets(
     vk::Device device, vk::DescriptorSet descriptorSet,
     std::vector<std::tuple<vk::DescriptorType, vk::Buffer, vk::BufferView>> const &bufferData,
-    std::vector<struct VulkanTextureData> const &textureData, uint32_t bindingOffset); 
+    std::vector<std::shared_ptr<struct VulkanTextureData>> const &textureData, uint32_t bindingOffset); 
 
 vk::UniqueCommandBuffer createCommandBuffer(vk::Device device, vk::CommandPool commandPool,
                                             vk::CommandBufferLevel level);

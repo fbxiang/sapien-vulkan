@@ -17,6 +17,10 @@ struct PBRMaterialUBO {
   float roughness{1};
   float metallic{0};
   float additionalTransparency{0};
+  int hasColorMap{0};
+  int hasSpecularMap{0};
+  int hasNormalMap{0};
+  int hasHeightMap{0};
 };
 
 struct ObjectUBO {

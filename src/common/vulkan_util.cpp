@@ -59,13 +59,13 @@ void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::Image image, vk:
 void updateDescriptorSets(
     vk::Device device, vk::DescriptorSet descriptorSet,
     std::vector<std::tuple<vk::DescriptorType, vk::Buffer, vk::BufferView>> const &bufferData,
-    std::vector<struct VulkanTextureData> const &textureData, uint32_t bindingOffset) {
+    std::vector<std::shared_ptr<VulkanTextureData>> const &textureData, uint32_t bindingOffset) {
 
   std::vector<vk::DescriptorBufferInfo> bufferInfos;
   bufferInfos.reserve(bufferData.size());
 
   std::vector<vk::WriteDescriptorSet> writeDescriptorSets;
-  writeDescriptorSets.reserve(bufferData.size() + (textureData.empty() ? 0 : 1));
+  writeDescriptorSets.reserve(bufferData.size() + textureData.size() ? 1 : 0);
 
   uint32_t dstBinding = bindingOffset;
   for (auto const &bd : bufferData) {
@@ -74,12 +74,17 @@ void updateDescriptorSets(
                                                          nullptr, &bufferInfos.back(),
                                                          std::get<2>(bd) ? &std::get<2>(bd) : nullptr));
   }
-  if (!textureData.empty()) {
-    vk::DescriptorImageInfo imageInfo(*textureData[0].mTextureSampler, *textureData[0].mImageData->mImageView,
-                                      vk::ImageLayout::eShaderReadOnlyOptimal);
-    writeDescriptorSets.push_back(vk::WriteDescriptorSet(descriptorSet, dstBinding, 0, 1,
-                                                         vk::DescriptorType::eCombinedImageSampler, &imageInfo,
-                                                         nullptr, nullptr));
+  
+  std::vector<vk::DescriptorImageInfo> imageInfos;
+  for (auto const &tex : textureData) {
+    imageInfos.push_back(vk::DescriptorImageInfo(tex->mTextureSampler.get(),
+                                                 tex->mImageData->mImageView.get(),
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal));
+  }
+  if (imageInfos.size()) {
+    writeDescriptorSets.push_back(vk::WriteDescriptorSet(descriptorSet, dstBinding, 0, imageInfos.size(),
+                                                         vk::DescriptorType::eCombinedImageSampler,
+                                                         imageInfos.data()));
   }
   device.updateDescriptorSets(writeDescriptorSets, nullptr);
 }

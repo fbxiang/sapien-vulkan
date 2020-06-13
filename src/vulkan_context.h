@@ -30,6 +30,8 @@ class VulkanContext {
   GLFWwindow *mWindow;
 #endif
 
+  std::shared_ptr<struct VulkanTextureData> mPlaceholderTexture {nullptr};
+
  public:
   VulkanContext();
 
@@ -91,15 +93,19 @@ class VulkanContext {
   void initializeDescriptorSetLayouts();
   inline DescriptorSetLayouts const& getDescriptorSetLayouts() const { return mDescriptorSetLayouts; }
 
-  std::vector<std::unique_ptr<Object>> loadObjects(std::string const &file, float scale,
-                                                         bool ignoreRootTransform,
-                                                         glm::vec3 const &up, glm::vec3 const &forward);
+  std::vector<std::unique_ptr<Object>> loadObjects(std::string const &file, float scale = 1.f,
+                                                   bool ignoreRootTransform = true,
+                                                   glm::vec3 const &up = {0,1,0},
+                                                   glm::vec3 const &forward = {0,0, -1});
 
-  std::shared_ptr<struct VulkanMaterial> createMaterial() const;
+  std::shared_ptr<struct VulkanMaterial> createMaterial();
   std::unique_ptr<class VulkanScene> createVulkanScene() const;
   std::unique_ptr<struct VulkanObject> createVulkanObject() const;
   std::unique_ptr<VulkanRenderer> createVulkanRenderer();
   std::unique_ptr<struct Camera> createCamera() const;
+
+  std::shared_ptr<struct VulkanTextureData> loadTexture(std::string const &filename) const;
+  std::shared_ptr<struct VulkanTextureData> getPlaceholderTexture();
 };
 
 }
