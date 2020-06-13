@@ -273,7 +273,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       std::string p = std::string(path.C_Str());
       std::string fullPath = parentdir + p;
 
-      mat->mDiffuseMap = loadTexture(fullPath);
+      mat->setDiffuseTexture(loadTexture(fullPath));
       matSpec.hasColorMap = 1;
       log::info("Color texture loaded: {}", fullPath);
     }
@@ -283,7 +283,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       std::string p = std::string(path.C_Str());
       std::string fullPath = parentdir + p;
 
-      mat->mSpecularMap = loadTexture(fullPath);
+      mat->setSpecularTexture(loadTexture(fullPath));
       matSpec.hasSpecularMap = 1;
       log::info("Specular texture loaded: {}", fullPath);
     }
@@ -293,7 +293,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       std::string p = std::string(path.C_Str());
       std::string fullPath = parentdir + p;
 
-      mat->mNormalMap = loadTexture(fullPath);
+      mat->setNormalTexture(loadTexture(fullPath));
       matSpec.hasNormalMap = 1;
       log::info("Normal texture loaded: {}", fullPath);
     }
@@ -303,12 +303,10 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       std::string p = std::string(path.C_Str());
       std::string fullPath = parentdir + p;
 
-      mat->mHeightMap = loadTexture(fullPath);
+      mat->setHeightTexture(loadTexture(fullPath));
       matSpec.hasHeightMap = 1;
       log::info("Height texture loaded: {}", fullPath);
     }
-
-    mat->updateDescriptorSets();
     mat->setProperties(matSpec);
     mats.push_back(mat);
   }

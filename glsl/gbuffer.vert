@@ -22,13 +22,15 @@ layout(location = 3) in vec3 tangent;
 layout(location = 4) in vec3 bitangent;
 
 layout(location = 0) out vec4 outPosition;
-layout(location = 1) out mat3 outTbn;
+layout(location = 1) out vec2 outTexcoord;
+layout(location = 2) out mat3 outTbn;
 
 void main() {
   mat4 modelView = cameraUBO.viewMatrix * objectUBO.modelMatrix;
   mat3 normalMatrix = mat3(transpose(inverse(modelView)));
 
   outPosition = modelView * vec4(pos, 1);
+  outTexcoord = uv;
   gl_Position = cameraUBO.projectionMatrix * outPosition;
 
   vec3 outTangent = normalize(normalMatrix * tangent);

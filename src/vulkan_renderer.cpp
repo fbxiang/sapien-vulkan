@@ -186,7 +186,7 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
       commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
                                        2, vobj->mDescriptorSet.get(), nullptr);
       commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
-                                       3, vobj->mMaterial->mDescriptorSet.get(), nullptr);
+                                       3, vobj->mMaterial->getDescriptorSet(), nullptr);
 
       commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
       commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0, vk::IndexType::eUint32);
@@ -198,7 +198,7 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
 
 
 void VulkanRenderer::display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage, vk::Format swapchainFormat, uint32_t width, uint32_t height) {
-  auto & img = mRenderTargets.normal;
+  auto & img = mRenderTargets.albedo;
 
   transitionImageLayout(commandBuffer, img->mImage.get(), mRenderTargetFormats.colorFormat,
                         vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eTransferSrcOptimal,

@@ -22,7 +22,6 @@ static void glfw_resize_callback(GLFWwindow *, int w, int h) {
 
 void LoadCube(VulkanContext &context, Scene &scene) {
   auto mat = context.createMaterial();
-  mat->updateDescriptorSets();
   mat->setProperties({});
 
   auto mesh = VulkanMesh::CreateCube(context.getPhysicalDevice(), context.getDevice(),
@@ -45,15 +44,21 @@ void LoadRoom(VulkanContext &context, Scene &scene) {
   }
 }
 
+void LoadSponza(VulkanContext &context, Scene &scene) {
+  auto objs = context.loadObjects("/home/fx/Scenes/sponza/sponza.obj", 0.001f);
+  for (auto &obj : objs) {
+    scene.addObject(std::move(obj));
+  }
+}
+
 int main() {
   VulkanContext context;
   auto device = context.getDevice();
   auto renderer = context.createVulkanRenderer();
   auto scene = Scene(context.createVulkanScene());
   // LoadCube(context, scene);
-
-  device.waitIdle();
-  LoadRoom(context, scene);
+  // LoadRoom(context, scene);
+  LoadSponza(context, scene);
 
   auto camera = context.createCamera();
   FPSCameraController cameraController(*camera, {0,0,-1}, {0,1,0});

@@ -98,7 +98,7 @@ class VulkanContext {
                                                    glm::vec3 const &up = {0,1,0},
                                                    glm::vec3 const &forward = {0,0, -1});
 
-  std::shared_ptr<struct VulkanMaterial> createMaterial();
+  std::shared_ptr<class VulkanMaterial> createMaterial();
   std::unique_ptr<class VulkanScene> createVulkanScene() const;
   std::unique_ptr<struct VulkanObject> createVulkanObject() const;
   std::unique_ptr<VulkanRenderer> createVulkanRenderer();

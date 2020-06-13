@@ -10,7 +10,7 @@ layout(set = 3, binding = 0) uniform MaterialUBO {
   int hasSpecularTexture;
   int hasNormalTexture;
   int hasHeightTexture;
-} materialUBO;
+} material;
 
 layout(set = 3, binding = 1) uniform sampler2D colorTexture;
 layout(set = 3, binding = 2) uniform sampler2D specularTexture;
@@ -35,7 +35,9 @@ layout(set = 3, binding = 4) uniform sampler2D heightTexture;
 // } sceneUBO;
 
 layout(location = 0) in vec4 inPosition;
-layout(location = 1) in mat3 inTbn;
+layout(location = 1) in vec2 inTexcoord;
+layout(location = 2) in mat3 inTbn;
+
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outPosition;
 layout(location = 2) out vec4 outSpecular;
@@ -43,7 +45,19 @@ layout(location = 3) out vec4 outNormal;
 
 void main() {
   outPosition = inPosition;
-  outAlbedo = vec4(1,0,1,1);
-  outSpecular = vec4(0,0,0,0);
+  if (material.hasColorTexture != 0) {
+    outAlbedo = texture(colorTexture, inTexcoord);
+  } else {
+    outAlbedo = material.baseColor;
+  }
+
+  if (material.hasSpecularTexture != 0) {
+    outSpecular.r = texture(specularTexture, inTexcoord).r;
+  } else {
+    outSpecular.r = material.specular;
+  }
+  outSpecular.g = material.roughness;
+  outSpecular.b = material.metallic;
+
   outNormal = vec4(normalize(inTbn * vec3(0,0,1)), 0) * 0.5 + 0.5;
 }

@@ -3,17 +3,13 @@
 #include "common/glm_common.h"
 #include "common/vulkan.h"
 #include "uniform_buffers.h"
+#include <array>
 
 namespace svulkan
 {
 
-struct VulkanMaterial {
+class VulkanMaterial {
   vk::Device mDevice;
-
-  VulkanMaterial(vk::PhysicalDevice physicalDevice, vk::Device device,
-                 vk::DescriptorPool descriptorPool, vk::DescriptorSetLayout descriptorLayout,
-                 std::shared_ptr<VulkanTextureData> defaultTexture);
-  void setProperties(PBRMaterialUBO const &data);
   VulkanBufferData mUBO;
   vk::UniqueDescriptorSet mDescriptorSet;
   
@@ -22,11 +18,23 @@ struct VulkanMaterial {
   std::shared_ptr<VulkanTextureData> mNormalMap;
   std::shared_ptr<VulkanTextureData> mHeightMap;
 
-  void updateDescriptorSets();
+ public:
+  VulkanMaterial(vk::PhysicalDevice physicalDevice, vk::Device device,
+                 vk::DescriptorPool descriptorPool, vk::DescriptorSetLayout descriptorLayout,
+                 std::shared_ptr<VulkanTextureData> defaultTexture);
+  void setProperties(PBRMaterialUBO const &data);
 
-#if !defined(NDEBUG)
-  bool mInitialized = false;
-#endif
+  void setDiffuseTexture(std::shared_ptr<VulkanTextureData> tex);
+  void setSpecularTexture(std::shared_ptr<VulkanTextureData> tex);
+  void setNormalTexture(std::shared_ptr<VulkanTextureData> tex);
+  void setHeightTexture(std::shared_ptr<VulkanTextureData> tex);
+
+  inline auto getDiffuseTexture() const { return mDiffuseMap; };
+  inline auto getSpecularTexture() const {return mSpecularMap; };
+  inline auto getNormalTexture() const {return mNormalMap;};
+  inline auto getHeightTexture() const { return mHeightMap; };
+
+  inline vk::DescriptorSet getDescriptorSet() const { return mDescriptorSet.get(); }
 };
 
 }
