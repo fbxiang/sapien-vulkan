@@ -3,10 +3,17 @@
 #include "scene.h"
 #include "common/log.h"
 #include "pass/gbuffer.h"
+#include "pass/deferred.h"
 #include "camera.h"
 #include "camera_controller.h"
 
 #include "gui/gui.hpp"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "common/stb_image_write.h"
+
+#include <chrono>
+using namespace std::chrono;
 
 using namespace svulkan;
 
@@ -45,6 +52,13 @@ void LoadRoom(VulkanContext &context, Scene &scene) {
 }
 
 void LoadSponza(VulkanContext &context, Scene &scene) {
+  scene.setAmbientLight({0.3, 0.3, 0.3, 1});
+  scene.addDirectionalLight({{0,-1,-0.1,1}, {1,1,1,1}});
+
+  scene.addPointLight({{0.5, 0.3, 0,1}, {1,0,0,1}});
+  scene.addPointLight({{  0, 0.3, 0,1}, {0,1,0,1}});
+  scene.addPointLight({{-0.5, 0.3, 0,1}, {0,0,1,1}});
+
   auto objs = context.loadObjects("/home/fx/Scenes/sponza/sponza.obj", 0.001f);
   for (auto &obj : objs) {
     scene.addObject(std::move(obj));
@@ -62,7 +76,8 @@ int main() {
 
   auto camera = context.createCamera();
   FPSCameraController cameraController(*camera, {0,0,-1}, {0,1,0});
-  cameraController.setXYZ(0, 0.3, 3);
+  cameraController.setXYZ(0, 0.3, 0);
+  cameraController.setRPY(0, 0, 1.5);
 
   renderer->resize(800, 600);
 
@@ -147,6 +162,15 @@ int main() {
       gSwapchainRebuild = true;
     }
     device.waitIdle();
+
+    // auto now = high_resolution_clock::now();
+    // auto albedo = renderer->downloadAlbedo();
+    // std::vector<uint8_t> img(albedo.size());
+    // for (uint32_t i = 0; i < albedo.size(); ++i) {
+    //   img[i] = static_cast<uint8_t>(std::clamp(albedo[i] * 255, 0.f, 255.f));
+    // }
+    // std::cout << "Elapsed time: " << duration_cast<milliseconds>(high_resolution_clock::now() - now).count() << std::endl;
+    // stbi_write_png("test.png", 800, 600, 4, img.data(), 4 * 800);
 
     if (vwindow.isKeyDown('q')) {
       glfwSetWindowShouldClose(context.getWindow(), true);

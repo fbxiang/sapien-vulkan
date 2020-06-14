@@ -15,16 +15,18 @@ class Scene {
   std::vector<PointLight> pointLights {};
   std::vector<DirectionalLight> directionalLights {};
   std::vector<ParallelogramLight> parallelogramLights {};
-  glm::vec3 ambientLight {0, 0, 0};
+  glm::vec4 ambientLight {0, 0, 0, 1};
 
   std::unique_ptr<VulkanScene> mVulkanScene {};
 
-  void updateVulkanScene();
+  bool mLightUpdated = true;
 
  public:
   Scene(std::unique_ptr<VulkanScene> vulkanScene);
 
   inline VulkanScene *getVulkanScene() const { return mVulkanScene.get(); }
+
+  void updateUBO();
 
  public:
   inline const std::vector<std::unique_ptr<Object>> &getObjects() const { return objects; }
@@ -42,12 +44,12 @@ class Scene {
   /* should be called before rendering to update cache */
   void prepareObjectsForRender();
 
-  void setAmbientLight(glm::vec3 const &light);
+  void setAmbientLight(glm::vec4 const &light);
   void addPointLight(PointLight const &light);
   void addDirectionalLight(DirectionalLight const &light);
   void addParalleloGramLight(ParallelogramLight const &light);
 
-  inline glm::vec3 const &getAmbientLight() const { return ambientLight; }
+  inline glm::vec4 const &getAmbientLight() const { return ambientLight; }
   inline std::vector<PointLight> const &getPointLights() const { return pointLights; }
   inline std::vector<DirectionalLight> const &getDirectionalLights() const { return directionalLights; }
   inline std::vector<ParallelogramLight> const &getParallelogramLights() const {return parallelogramLights;}

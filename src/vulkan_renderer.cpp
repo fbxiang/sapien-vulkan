@@ -1,5 +1,6 @@
 #include "vulkan_renderer.h"
 #include "pass/gbuffer.h"
+#include "pass/deferred.h"
 #include "vulkan_context.h"
 #include "scene.h"
 #include "camera.h"
@@ -8,6 +9,12 @@ namespace svulkan {
 
 VulkanRenderer::VulkanRenderer(VulkanContext &context): mContext(&context) {
   mGBufferPass = std::make_unique<GBufferPass>(context);
+  mDeferredPass = std::make_unique<DeferredPass>(context);
+
+  mDeferredDescriptorSet = std::move(
+      mContext->getDevice().allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
+          mContext->getDescriptorPool(), 1, &mContext->getDescriptorSetLayouts().deferred.get()))
+      .front());
 }
 
 void VulkanRenderer::resize(int width, int height) {
@@ -20,7 +27,9 @@ void VulkanRenderer::resize(int width, int height) {
 }
 
 void VulkanRenderer::initializeRenderTextures() {
-  mRenderTargetFormats.colorFormat = vk::Format::eR8G8B8A8Unorm;
+  // mRenderTargetFormats.colorFormat = vk::Format::eR8G8B8A8Unorm;
+  mRenderTargetFormats.colorFormat = vk::Format::eR32G32B32A32Sfloat;
+  mRenderTargetFormats.segmentationFormat = vk::Format::eR32G32B32A32Uint;
   mRenderTargetFormats.depthFormat = vk::Format::eD32Sfloat;
 
   mRenderTargets.albedo = std::make_unique<VulkanImageData>(
@@ -47,6 +56,13 @@ void VulkanRenderer::initializeRenderTextures() {
   mRenderTargets.normal = std::make_unique<VulkanImageData>(
       mContext->getPhysicalDevice(), mContext->getDevice(),
       mRenderTargetFormats.colorFormat, vk::Extent2D(mWidth, mHeight), 1, vk::ImageTiling::eOptimal,
+      vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+      vk::ImageUsageFlagBits::eTransferSrc,
+      vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eColor);
+
+  mRenderTargets.segmentation = std::make_unique<VulkanImageData>(
+      mContext->getPhysicalDevice(), mContext->getDevice(),
+      mRenderTargetFormats.segmentationFormat, vk::Extent2D(mWidth, mHeight), 1, vk::ImageTiling::eOptimal,
       vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
       vk::ImageUsageFlagBits::eTransferSrc,
       vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eColor);
@@ -118,34 +134,71 @@ void VulkanRenderer::initializeRenderTextures() {
                             vk::PipelineStageFlagBits::eLateFragmentTests,
                             vk::ImageAspectFlagBits::eDepth);
     });
+
+  // bind textures to deferred descriptor set
+  mDeferredSampler = mContext->getDevice().createSamplerUnique(vk::SamplerCreateInfo(
+      vk::SamplerCreateFlags(), vk::Filter::eNearest, vk::Filter::eNearest, vk::SamplerMipmapMode::eNearest,
+      vk::SamplerAddressMode::eClampToBorder, vk::SamplerAddressMode::eClampToBorder,
+      vk::SamplerAddressMode::eClampToBorder, 0.f, false, 0.f, false, vk::CompareOp::eNever, 0.f, 0.f,
+      vk::BorderColor::eFloatOpaqueBlack));
+  std::vector<vk::DescriptorImageInfo> imageInfos = {
+    vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.albedo->mImageView.get(),
+                            vk::ImageLayout::eShaderReadOnlyOptimal),
+    vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.position->mImageView.get(),
+                            vk::ImageLayout::eShaderReadOnlyOptimal),
+    vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.specular->mImageView.get(),
+                            vk::ImageLayout::eShaderReadOnlyOptimal),
+    vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.normal->mImageView.get(),
+                            vk::ImageLayout::eShaderReadOnlyOptimal),
+    vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.depth->mImageView.get(),
+                            vk::ImageLayout::eShaderReadOnlyOptimal)};
+  std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {
+    vk::WriteDescriptorSet(mDeferredDescriptorSet.get(), 0, 0, imageInfos.size(),
+                           vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
+  mContext->getDevice().updateDescriptorSets(writeDescriptorSets, nullptr);
 }
 
 void VulkanRenderer::initializeRenderPasses() {
-  auto &l = mContext->getDescriptorSetLayouts();
-  std::vector<vk::DescriptorSetLayout> layouts = {
-    l.scene.get(), l.camera.get(),
-    l.object.get(), l.material.get()};
-  std::vector<vk::Format> colorFormats = {
-    vk::Format::eR8G8B8A8Unorm,  // color
-    vk::Format::eR8G8B8A8Unorm,  // position
-    vk::Format::eR8G8B8A8Unorm,  // specular
-    vk::Format::eR8G8B8A8Unorm   // normal
-  };
-  vk::Format depthFormat = vk::Format::eD32Sfloat;
-  mGBufferPass->initializePipeline(layouts, colorFormats, depthFormat,
-                                   vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
-
   assert(mWidth > 0 && mHeight > 0);
 
-  mGBufferPass->initializeFramebuffer(
-      {mRenderTargets.albedo->mImageView.get(),
-       mRenderTargets.position->mImageView.get(),
-       mRenderTargets.specular->mImageView.get(),
-       mRenderTargets.normal->mImageView.get()},
-      mRenderTargets.depth->mImageView.get(),
-      {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
-}
+  auto &l = mContext->getDescriptorSetLayouts();
 
+  // initialize gbuffer pass
+  {
+    std::vector<vk::DescriptorSetLayout> layouts = {
+      l.scene.get(), l.camera.get(),
+      l.object.get(), l.material.get()};
+    std::vector<vk::Format> colorFormats = {
+      mRenderTargetFormats.colorFormat,
+      mRenderTargetFormats.colorFormat,
+      mRenderTargetFormats.colorFormat,
+      mRenderTargetFormats.colorFormat,
+      mRenderTargetFormats.segmentationFormat
+    };
+
+    mGBufferPass->initializePipeline(layouts, colorFormats, mRenderTargetFormats.depthFormat,
+                                     vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
+    mGBufferPass->initializeFramebuffer(
+        {mRenderTargets.albedo->mImageView.get(),
+         mRenderTargets.position->mImageView.get(),
+         mRenderTargets.specular->mImageView.get(),
+         mRenderTargets.normal->mImageView.get(),
+         mRenderTargets.segmentation->mImageView.get()
+        },
+        mRenderTargets.depth->mImageView.get(),
+        {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
+  }
+
+  // initialize deferred pass
+  {
+    std::vector<vk::DescriptorSetLayout> layouts = {
+      l.scene.get(), l.camera.get(), l.deferred.get()
+    };
+    mDeferredPass->initializePipeline(layouts, {mRenderTargetFormats.colorFormat});
+    mDeferredPass->initializeFramebuffer({mRenderTargets.lighting->mImageView.get()},
+                                         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
+  }
+}
 
 void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camera &camera) {
   // sync object data to GPU
@@ -156,49 +209,123 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
 
   // sync camera data to GPU
   camera.updateUBO();
+  scene.updateUBO();
 
-  std::vector<vk::ClearValue> clearValues;
-  clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f}));  // albedo
-  clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // position
-  clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // specular
-  clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // normal
-  clearValues.push_back(vk::ClearDepthStencilValue(1.0f, 0));  // depth
+  // render gbuffer pass
+  {
+    std::vector<vk::ClearValue> clearValues;
+    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f}));  // albedo
+    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // position
+    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // specular
+    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // normal
+    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));  // segmentation
+    clearValues.push_back(vk::ClearDepthStencilValue(1.0f, 0));  // depth
 
-  vk::RenderPassBeginInfo renderPassBeginInfo {
-    mGBufferPass->getRenderPass(), mGBufferPass->getFramebuffer(),
-    vk::Rect2D({0,0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}),
-    static_cast<uint32_t>(clearValues.size()), clearValues.data()};
+    vk::RenderPassBeginInfo renderPassBeginInfo {
+      mGBufferPass->getRenderPass(), mGBufferPass->getFramebuffer(),
+      vk::Rect2D({0,0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}),
+      static_cast<uint32_t>(clearValues.size()), clearValues.data()};
 
-  commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-  commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipeline());
-  commandBuffer.setViewport(0, {
-      {0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}
-    });
-  commandBuffer.setScissor(0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
+    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipeline());
+    commandBuffer.setViewport(0, {
+        {0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}
+      });
+    commandBuffer.setScissor(0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
 
-  commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
-                                   0, scene.getVulkanScene()->getDescriptorSet(), nullptr);
-  commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
-                                   1, camera.mDescriptorSet.get(), nullptr);
-  for (auto &obj : scene.getOpaqueObjects()) {
-    auto vobj = obj->getVulkanObject();
-    if (vobj) {
-      commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
-                                       2, vobj->mDescriptorSet.get(), nullptr);
-      commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
-                                       3, vobj->mMaterial->getDescriptorSet(), nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
+                                     0, scene.getVulkanScene()->getDescriptorSet(), nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
+                                     1, camera.mDescriptorSet.get(), nullptr);
+    for (auto &obj : scene.getOpaqueObjects()) {
+      auto vobj = obj->getVulkanObject();
+      if (vobj) {
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
+                                         2, vobj->mDescriptorSet.get(), nullptr);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mGBufferPass->getPipelineLayout(),
+                                         3, vobj->mMaterial->getDescriptorSet(), nullptr);
 
-      commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
-      commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0, vk::IndexType::eUint32);
-      commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);
+        commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
+        commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0, vk::IndexType::eUint32);
+        commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);
+      }
     }
+    commandBuffer.endRenderPass();
   }
-  commandBuffer.endRenderPass();
+
+  // render deferred pass
+  {
+    // transition to texture formats
+    for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
+        mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
+      transitionImageLayout(commandBuffer, img, mRenderTargetFormats.colorFormat,
+                            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+                            vk::AccessFlagBits::eColorAttachmentWrite,
+                            vk::AccessFlagBits::eShaderRead,
+                            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            vk::PipelineStageFlagBits::eFragmentShader,
+                            vk::ImageAspectFlagBits::eColor);
+    }
+    transitionImageLayout(commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+                          vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                          vk::ImageLayout::eShaderReadOnlyOptimal,
+                          vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+                          vk::AccessFlagBits::eShaderRead,
+                          vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                          vk::PipelineStageFlagBits::eLateFragmentTests,
+                          vk::PipelineStageFlagBits::eFragmentShader,
+                          vk::ImageAspectFlagBits::eDepth);
+
+    // draw quad
+    std::vector<vk::ClearValue> clearValues = { vk::ClearColorValue{std::array{0.f,0.f,0.f,1.f}} };
+    vk::RenderPassBeginInfo renderPassBeginInfo {
+      mDeferredPass->getRenderPass(), mDeferredPass->getFramebuffer(),
+      vk::Rect2D{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}},
+      static_cast<uint32_t>(clearValues.size()), clearValues.data()
+    };
+    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mDeferredPass->getPipeline());
+    commandBuffer.setViewport(0, {
+        {0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}
+      });
+    commandBuffer.setScissor(0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mDeferredPass->getPipelineLayout(),
+                                     0, scene.getVulkanScene()->getDescriptorSet(), nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mDeferredPass->getPipelineLayout(),
+                                     1, camera.mDescriptorSet.get(), nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, mDeferredPass->getPipelineLayout(),
+                                     2, mDeferredDescriptorSet.get(), nullptr);
+
+    commandBuffer.draw(3, 1, 0, 0);
+    commandBuffer.endRenderPass();
+
+    // transition textures back to gbuffer formats
+    for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
+        mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
+      transitionImageLayout(commandBuffer, img, mRenderTargetFormats.colorFormat,
+                            vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
+                            vk::AccessFlagBits::eShaderRead,
+                            vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+                            vk::PipelineStageFlagBits::eFragmentShader,
+                            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                            vk::ImageAspectFlagBits::eColor);
+    }
+    transitionImageLayout(commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+                          vk::ImageLayout::eShaderReadOnlyOptimal,
+                          vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                          vk::AccessFlagBits::eShaderRead,
+                          vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                          vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+                          vk::PipelineStageFlagBits::eFragmentShader,
+                          vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                          vk::PipelineStageFlagBits::eLateFragmentTests,
+                          vk::ImageAspectFlagBits::eDepth);
+  }
 }
 
 
 void VulkanRenderer::display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage, vk::Format swapchainFormat, uint32_t width, uint32_t height) {
-  auto & img = mRenderTargets.albedo;
+  auto & img = mRenderTargets.lighting;
 
   transitionImageLayout(commandBuffer, img->mImage.get(), mRenderTargetFormats.colorFormat,
                         vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eTransferSrcOptimal,
@@ -234,5 +361,12 @@ void VulkanRenderer::display(vk::CommandBuffer commandBuffer, vk::Image swapchai
                         vk::ImageAspectFlagBits::eColor);
 }
 
+std::vector<float> VulkanRenderer::downloadAlbedo() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * 4 * sizeof(float);
+  return mRenderTargets.albedo->download<float>(mContext->getPhysicalDevice(),
+                                         mContext->getDevice(), mContext->getCommandPool(),
+                                         mContext->getGraphicsQueue(), size);
+}
 
 } // namespace svulkan

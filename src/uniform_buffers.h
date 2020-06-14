@@ -31,6 +31,7 @@ struct ObjectUBO {
 constexpr int NumDirectionalLights = 3;
 constexpr int NumPointLights = 10;
 struct SceneUBO {
+  glm::vec4 ambientLight;
   DirectionalLight directionalLights[NumDirectionalLights];
   PointLight pointLights[NumPointLights];
 };

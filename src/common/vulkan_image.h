@@ -66,9 +66,8 @@ struct VulkanImageData {
                               vk::AccessFlagBits::eTransferRead,
                               vk::AccessFlagBits::eColorAttachmentRead |
                               vk::AccessFlagBits::eColorAttachmentWrite,
-
                               vk::PipelineStageFlagBits::eTransfer,
-                              vk::PipelineStageFlagBits::eFragmentShader,
+                              vk::PipelineStageFlagBits::eColorAttachmentOutput,
                               vk::ImageAspectFlagBits::eColor, mMipLevels);
         transitionImageLayout(commandBuffer, dstImage.get(), mFormat,
                               vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral,

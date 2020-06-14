@@ -2,6 +2,18 @@ cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(vulkanrenderer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG "-o0 -g3 -Wall")
+set(CMAKE_CXX_FLAGS_RELEASE "-o3 -g0 -Wall")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("-- DEBUG Build")
+    set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_DEBUG})
+    add_definitions(-DVK_VALIDATION)
+    add_definitions(-D_DEBUG)
+else ()
+    message("-- RELEASE Build")
+    set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_RELEASE})
+    add_definitions(-DNDEBUG)
+endif ()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(assimp REQUIRED)
@@ -10,7 +22,6 @@ file(GLOB_RECURSE RENDER_SRC "src/*.cpp")
 
 set(ON_SCREEN TRUE CACHE BOOL "Build with on screen rendering support")
 
-add_definitions(-DVK_VALIDATION)
 include_directories("src")
 include_directories("3rd_party/glfw/include")
 

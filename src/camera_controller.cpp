@@ -10,7 +10,7 @@ FPSCameraController::FPSCameraController(Camera &camera, glm::vec3 forward, glm:
       mUp(glm::normalize(up)),
       mLeft(glm::cross(mUp, mForward)) {}
 
-void FPSCameraController::setRPY(float yaw, float pitch, float roll) {
+void FPSCameraController::setRPY(float roll, float pitch, float yaw) {
   mRPY = {roll, pitch, yaw};
   update();
 }

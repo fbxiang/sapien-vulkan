@@ -10,6 +10,7 @@
 #include <iostream>
 #include "vulkan_renderer.h"
 #include "pass/gbuffer.h"
+#include "pass/deferred.h"
 #include "camera.h"
 #include "common/vulkan_texture.h"
 
@@ -188,17 +189,23 @@ void VulkanContext::initializeDescriptorSetLayouts() {
            {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
            {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}
           });
+
+  mDescriptorSetLayouts.deferred = createDescriptorSetLayout(
+      getDevice(), {
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // albedo
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // position
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // specular
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // normal
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}  // depth
+      });
 }
 
 std::shared_ptr<VulkanTextureData> VulkanContext::getPlaceholderTexture() {
   if (!mPlaceholderTexture) {
     mPlaceholderTexture = std::make_shared<VulkanTextureData>(
-        getPhysicalDevice(), getDevice(), vk::Extent2D{64u, 64u});
-    // char zeros[4] = {0,0,0,0};
+        getPhysicalDevice(), getDevice(), vk::Extent2D{1u, 1u});
     mPlaceholderTexture->setImage(getPhysicalDevice(), getDevice(), getCommandPool(), getGraphicsQueue(),
-                                  [&](void *target, vk::Extent2D const &extent) {
-                                    // memcpy(target, zeros, 4);
-                                  });
+                                  [&](void *target, vk::Extent2D const &extent) {});
   }
   return mPlaceholderTexture;
 }

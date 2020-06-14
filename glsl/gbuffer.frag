@@ -35,29 +35,37 @@ layout(set = 3, binding = 4) uniform sampler2D heightTexture;
 // } sceneUBO;
 
 layout(location = 0) in vec4 inPosition;
-layout(location = 1) in vec2 inTexcoord;
-layout(location = 2) in mat3 inTbn;
+layout(location = 1) in vec2 inUV;
+layout(location = 2) in flat uvec4 inSegmentation;
+layout(location = 3) in mat3 inTbn;
 
 layout(location = 0) out vec4 outAlbedo;
 layout(location = 1) out vec4 outPosition;
 layout(location = 2) out vec4 outSpecular;
 layout(location = 3) out vec4 outNormal;
+layout(location = 4) out uvec4 outSegmentation;
 
 void main() {
+  outSegmentation = inSegmentation;
+
   outPosition = inPosition;
   if (material.hasColorTexture != 0) {
-    outAlbedo = texture(colorTexture, inTexcoord);
+    outAlbedo = texture(colorTexture, inUV);
   } else {
     outAlbedo = material.baseColor;
   }
 
   if (material.hasSpecularTexture != 0) {
-    outSpecular.r = texture(specularTexture, inTexcoord).r;
+    outSpecular.r = texture(specularTexture, inUV).r;
   } else {
     outSpecular.r = material.specular;
   }
   outSpecular.g = material.roughness;
   outSpecular.b = material.metallic;
 
-  outNormal = vec4(normalize(inTbn * vec3(0,0,1)), 0) * 0.5 + 0.5;
+  if (material.hasNormalTexture != 0) {
+    outNormal = vec4(normalize(inTbn * texture(normalTexture, inUV).xyz), 0) * 0.5 + 0.5;
+  } else {
+    outNormal = vec4(normalize(inTbn * vec3(0,0,1)), 0) * 0.5 + 0.5;
+  }
 }

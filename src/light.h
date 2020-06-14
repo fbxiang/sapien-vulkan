@@ -3,13 +3,13 @@
 
 namespace svulkan {
 struct PointLight {
-  glm::vec3 position;
-  glm::vec3 emission;
+  glm::vec4 position;
+  glm::vec4 emission;
 };
 
 struct DirectionalLight {
-  glm::vec3 direction;
-  glm::vec3 emission;
+  glm::vec4 direction;
+  glm::vec4 emission;
 };
 
 struct ParallelogramLight {

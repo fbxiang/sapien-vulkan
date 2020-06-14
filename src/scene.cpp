@@ -3,8 +3,19 @@
 namespace svulkan
 {
 
-void Scene::updateVulkanScene() {
-  // TODO: finish this
+void Scene::updateUBO() {
+  if (mLightUpdated) {
+    SceneUBO ubo {};
+    ubo.ambientLight = ambientLight;
+    for (uint32_t i = 0; i < std::min<uint32_t>(NumDirectionalLights, directionalLights.size()); ++i) {
+      ubo.directionalLights[i] = directionalLights[i];
+    }
+    for (uint32_t i = 0; i < std::min<uint32_t>(NumPointLights, pointLights.size()); ++i) {
+      ubo.pointLights[i] = pointLights[i];
+    }
+    mVulkanScene->updateUBO(ubo);
+    mLightUpdated = false;
+  }
 }
 
 Scene::Scene(std::unique_ptr<VulkanScene> vulkanScene) : mVulkanScene(std::move(vulkanScene)) {}
@@ -38,20 +49,24 @@ void Scene::removeObjectsByName(std::string name) {
   }
 }
 
-void Scene::setAmbientLight(glm::vec3 const &light) {
+void Scene::setAmbientLight(glm::vec4 const &light) {
   ambientLight = light;
+  mLightUpdated = true;
 }
 
 void Scene::addPointLight(PointLight const &light) {
   pointLights.push_back(light);
+  mLightUpdated = true;
 }
 
 void Scene::addDirectionalLight(DirectionalLight const &light) {
   directionalLights.push_back(light);
+  mLightUpdated = true;
 }
 
 void Scene::addParalleloGramLight(ParallelogramLight const &light) {
   parallelogramLights.push_back(light);
+  mLightUpdated = true;
 }
 
 static void prepareObjectTree(Object *obj, const glm::mat4 &parentModelMat,

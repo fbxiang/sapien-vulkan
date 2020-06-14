@@ -16,6 +16,7 @@ class VulkanRenderer {
     std::unique_ptr<VulkanImageData> position;
     std::unique_ptr<VulkanImageData> specular;
     std::unique_ptr<VulkanImageData> normal;
+    std::unique_ptr<VulkanImageData> segmentation;
     std::unique_ptr<VulkanImageData> depth;
 
     std::unique_ptr<VulkanImageData> lighting;
@@ -23,10 +24,14 @@ class VulkanRenderer {
 
   struct RenderTargetFormats {
     vk::Format colorFormat;
+    vk::Format segmentationFormat;
     vk::Format depthFormat;
   } mRenderTargetFormats;
 
   std::unique_ptr<class GBufferPass> mGBufferPass;
+  std::unique_ptr<class DeferredPass> mDeferredPass;
+  vk::UniqueDescriptorSet mDeferredDescriptorSet;
+  vk::UniqueSampler mDeferredSampler;
 
  public:
   VulkanRenderer(VulkanContext &context);
@@ -45,6 +50,13 @@ class VulkanRenderer {
   /* blit image to screen */
   void display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage, vk::Format swapchainFormat,
                uint32_t width, uint32_t height);
+
+  std::vector<float> downloadAlbedo();
+  std::vector<float> downloadPosition();
+  std::vector<float> downloadNormal();
+  std::vector<uint32_t> downloadSegmentation();
+  std::vector<float> downloadDepth();
+  std::vector<float> downloadLighting();
 };
 
 }

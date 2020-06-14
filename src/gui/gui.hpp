@@ -106,6 +106,8 @@ class VulkanWindow {
   }
   
   ImVec2 getMouseDelta() {
+    mMouseDelta.x = std::clamp(mMouseDelta.x, -100.f, 100.f);
+    mMouseDelta.y = std::clamp(mMouseDelta.y, -100.f, 100.f);
     return mMouseDelta;
   }
 
