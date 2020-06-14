@@ -37,6 +37,9 @@ endif()
 
 add_custom_target(glsl COMMAND glslc -c ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.vert ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.frag)
 
-add_executable(main ${RENDER_SRC} ${GUI_SRC})
-target_link_libraries(main ${ASSIMP_LIBRARIES} glfw Vulkan::Vulkan spdlog stdc++fs)
+add_library(sapien-vulkan ${RENDER_SRC} ${GUI_SRC})
+target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} glfw Vulkan::Vulkan spdlog stdc++fs)
+
+add_executable(main app/main.cpp)
+target_link_libraries(main sapien-vulkan)
 add_dependencies(main glsl)
