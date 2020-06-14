@@ -34,12 +34,15 @@ if (${ON_SCREEN})
         "3rd_party/imgui/examples/imgui_impl_vulkan.cpp" )
 endif()
 
-
-add_custom_target(glsl COMMAND glslc -c ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.vert ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.frag)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/spv)
+add_custom_target(glsl
+    COMMAND glslc -c ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.vert ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.frag
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/spv
+    )
 
 add_library(sapien-vulkan ${RENDER_SRC} ${GUI_SRC})
 target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} glfw Vulkan::Vulkan spdlog stdc++fs)
+add_dependencies(sapien-vulkan glsl)
 
 add_executable(main app/main.cpp)
 target_link_libraries(main sapien-vulkan)
-add_dependencies(main glsl)

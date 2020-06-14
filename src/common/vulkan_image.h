@@ -21,70 +21,69 @@ struct VulkanImageData {
                   vk::ImageLayout initialLayout, vk::MemoryPropertyFlags memoryProperties,
                   vk::ImageAspectFlags aspectMask);
 
-
-  // TODO: color attachment only for now
   template <typename DataType>
   std::vector<DataType> download(vk::PhysicalDevice physicalDevice, vk::Device device,
                                  vk::CommandPool commandPool, vk::Queue queue, size_t size) const {
+    vk::ImageLayout sourceLayout;
+    vk::AccessFlags sourceAccessFlag1;
+    vk::AccessFlags sourceAccessFlag2;
+    vk::PipelineStageFlags sourceStage;
+    vk::ImageAspectFlags aspect = vk::ImageAspectFlagBits::eColor;
+
+    // only support float textures
+    static_assert(sizeof(DataType) == 4);
+
+    if (mFormat == vk::Format::eR32G32B32A32Sfloat) {
+      sourceLayout = vk::ImageLayout::eColorAttachmentOptimal;
+      sourceAccessFlag1 = vk::AccessFlagBits::eColorAttachmentWrite;
+      sourceAccessFlag2 = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eColorAttachmentRead;
+      sourceStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+      aspect = vk::ImageAspectFlagBits::eColor;
+    } else if (mFormat == vk::Format::eD32Sfloat) {
+      sourceLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+      sourceAccessFlag1 = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+      sourceAccessFlag2 = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead;
+      sourceStage = vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests;
+      aspect = vk::ImageAspectFlagBits::eDepth;
+    } else {
+      throw std::runtime_error("This image format does not support download");
+    }
 
     std::vector<DataType> output;
 
     if (!((mMemoryProperties & vk::MemoryPropertyFlagBits::eHostVisible) &&
           (mMemoryProperties & vk::MemoryPropertyFlagBits::eHostCoherent))) {
-      vk::ImageCreateInfo imageCreateInfo(vk::ImageCreateFlags(), vk::ImageType::e2D, mFormat,
-                                          vk::Extent3D(mExtent, 1), 1, 1, vk::SampleCountFlagBits::e1,
-                                          vk::ImageTiling::eLinear, vk::ImageUsageFlagBits::eTransferDst,
-                                          vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined);
-      // create "staging image"
-      vk::UniqueImage dstImage = device.createImageUnique(imageCreateInfo);
-      vk::UniqueDeviceMemory dstMemory = allocateMemory(
-          device, physicalDevice.getMemoryProperties(), device.getImageMemoryRequirements(dstImage.get()),
-          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-      device.bindImageMemory(*dstImage, *dstMemory, 0);
 
+      VulkanBufferData stagingBuffer(physicalDevice, device, size, vk::BufferUsageFlagBits::eTransferDst);
+
+      // copy image to buffer
       OneTimeSubmit(device, commandPool, queue, [&](vk::CommandBuffer commandBuffer) {
         transitionImageLayout(commandBuffer, mImage.get(), mFormat,
-                              vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eTransferSrcOptimal,
-                              vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eTransferRead,
-                              vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                              vk::PipelineStageFlagBits::eTransfer,
-                              vk::ImageAspectFlagBits::eColor, mMipLevels);
-        transitionImageLayout(commandBuffer, dstImage.get(), mFormat,
-                              vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
-                              vk::AccessFlags(), vk::AccessFlagBits::eTransferWrite,
-                              vk::PipelineStageFlagBits::eTopOfPipe,
-                              vk::PipelineStageFlagBits::eTransfer,
-                              vk::ImageAspectFlagBits::eColor, 1);
-        vk::ImageCopy imageCopy(
-            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-            vk::Offset3D(0, 0, 0),
-            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-            vk::Offset3D(0, 0, 0), vk::Extent3D(mExtent, 1));
-        commandBuffer.copyImage(mImage.get(), vk::ImageLayout::eTransferSrcOptimal, dstImage.get(), vk::ImageLayout::eTransferDstOptimal, imageCopy);
+                              sourceLayout, vk::ImageLayout::eTransferSrcOptimal,
+                              sourceAccessFlag1, vk::AccessFlagBits::eTransferRead,
+                              sourceStage, vk::PipelineStageFlagBits::eTransfer,
+                              aspect, mMipLevels);
+        vk::BufferImageCopy copyRegion(0, mExtent.width, mExtent.height, {aspect, 0, 0, 1},
+                                       {0, 0, 0}, vk::Extent3D(mExtent, 1));
+        commandBuffer.copyImageToBuffer(mImage.get(), vk::ImageLayout::eTransferSrcOptimal,
+                                        stagingBuffer.getBuffer(), copyRegion);
         transitionImageLayout(commandBuffer, mImage.get(), mFormat,
-                              vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eColorAttachmentOptimal,
+                              vk::ImageLayout::eTransferSrcOptimal, sourceLayout,
                               vk::AccessFlagBits::eTransferRead,
-                              vk::AccessFlagBits::eColorAttachmentRead |
-                              vk::AccessFlagBits::eColorAttachmentWrite,
+                              sourceAccessFlag2,
                               vk::PipelineStageFlagBits::eTransfer,
-                              vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                              vk::ImageAspectFlagBits::eColor, mMipLevels);
-        transitionImageLayout(commandBuffer, dstImage.get(), mFormat,
-                              vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral,
-                              vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eHostRead,
-                              vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
-                              vk::ImageAspectFlagBits::eColor);
+                              sourceStage,
+                              aspect, mMipLevels);
       });
 
-      vk::ImageSubresource subResource(vk::ImageAspectFlagBits::eColor, 0, 0);
-      vk::SubresourceLayout subresourceLayout = device.getImageSubresourceLayout(dstImage.get(), subResource);
-
+      // copy buffer to host memory
       output.resize(size / sizeof(DataType));
-      const char *memory = static_cast<const char *>(device.mapMemory(dstMemory.get(), 0, size));
-      memcpy(output.data(), memory + subresourceLayout.offset, size);
-      device.unmapMemory(dstMemory.get());
+      const char *memory = static_cast<const char *>(device.mapMemory(stagingBuffer.getMemory(), 0, size));
+      memcpy(output.data(), memory, size);
+      device.unmapMemory(stagingBuffer.getMemory());
+
     } else {
-      vk::ImageSubresource subResource(vk::ImageAspectFlagBits::eColor, 0, 0);
+      vk::ImageSubresource subResource(aspect, 0, 0);
       vk::SubresourceLayout subresourceLayout = device.getImageSubresourceLayout(mImage.get(), subResource);
 
       output.resize(size / sizeof(DataType));

@@ -32,8 +32,8 @@ static vk::UniquePipeline createGraphicsPipeline(vk::Device device, uint32_t num
                                                  vk::RenderPass renderPass) {
   vk::UniquePipelineCache pipelineCache = device.createPipelineCacheUnique({});
 
-  auto vsm = createShaderModule(device, "deferred.vert.spv");
-  auto fsm = createShaderModule(device, "deferred.frag.spv");
+  auto vsm = createShaderModule(device, "spv/deferred.vert.spv");
+  auto fsm = createShaderModule(device, "spv/deferred.frag.spv");
 
   // TODO: clean up light count handling
   std::vector<vk::SpecializationMapEntry> entries = { vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),

@@ -47,8 +47,6 @@ void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::Image image, vk:
                            vk::AccessFlags sourceAccessMask, vk::AccessFlags destAccessMask,
                            vk::PipelineStageFlags sourceStage, vk::PipelineStageFlags destStage,
                            vk::ImageAspectFlags aspectMask, uint32_t mipLevels) {
-  // TODO: do a warning if something seems off
-
   vk::ImageSubresourceRange imageSubresourceRange(aspectMask, 0, mipLevels, 0, 1);
   vk::ImageMemoryBarrier barrier(sourceAccessMask, destAccessMask, oldImageLayout, newImageLayout,
                                  VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image, imageSubresourceRange);

@@ -369,4 +369,53 @@ std::vector<float> VulkanRenderer::downloadAlbedo() {
                                          mContext->getGraphicsQueue(), size);
 }
 
+
+std::vector<float> VulkanRenderer::downloadPosition() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * 4 * sizeof(float);
+  return mRenderTargets.position->download<float>(mContext->getPhysicalDevice(),
+                                                mContext->getDevice(), mContext->getCommandPool(),
+                                                mContext->getGraphicsQueue(), size);
+}
+
+std::vector<float> VulkanRenderer::downloadSpecular() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * 4 * sizeof(float);
+  return mRenderTargets.specular->download<float>(mContext->getPhysicalDevice(),
+                                                mContext->getDevice(), mContext->getCommandPool(),
+                                                mContext->getGraphicsQueue(), size);
+}
+
+std::vector<float> VulkanRenderer::downloadNormal() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * 4 * sizeof(float);
+  return mRenderTargets.normal->download<float>(mContext->getPhysicalDevice(),
+                                                  mContext->getDevice(), mContext->getCommandPool(),
+                                                  mContext->getGraphicsQueue(), size);
+}
+
+std::vector<float> VulkanRenderer::downloadLighting() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * 4 * sizeof(float);
+  return mRenderTargets.lighting->download<float>(mContext->getPhysicalDevice(),
+                                                mContext->getDevice(), mContext->getCommandPool(),
+                                                mContext->getGraphicsQueue(), size);
+}
+
+std::vector<float> VulkanRenderer::downloadDepth() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * sizeof(float);
+  return mRenderTargets.depth->download<float>(mContext->getPhysicalDevice(),
+                                               mContext->getDevice(), mContext->getCommandPool(),
+                                               mContext->getGraphicsQueue(), size);
+}
+
+std::vector<uint32_t> VulkanRenderer::downloadSegmentation() {
+  size_t size = (mRenderTargets.albedo->mExtent.width * mRenderTargets.albedo->mExtent.height)
+                * 4 * sizeof(uint32_t);
+  return mRenderTargets.segmentation->download<uint32_t>(mContext->getPhysicalDevice(),
+                                               mContext->getDevice(), mContext->getCommandPool(),
+                                               mContext->getGraphicsQueue(), size);
+}
+
 } // namespace svulkan

@@ -41,8 +41,8 @@ static vk::UniquePipeline createGraphicsPipeline(vk::Device device, uint32_t num
                                                    ) {
   vk::UniquePipelineCache pipelineCache = device.createPipelineCacheUnique(vk::PipelineCacheCreateInfo());
 
-  auto vsm = createShaderModule(device, "gbuffer.vert.spv");
-  auto fsm = createShaderModule(device, "gbuffer.frag.spv");
+  auto vsm = createShaderModule(device, "spv/gbuffer.vert.spv");
+  auto fsm = createShaderModule(device, "spv/gbuffer.frag.spv");
 
   std::array<vk::PipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos {
     vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),

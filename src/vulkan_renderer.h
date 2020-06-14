@@ -53,6 +53,7 @@ class VulkanRenderer {
 
   std::vector<float> downloadAlbedo();
   std::vector<float> downloadPosition();
+  std::vector<float> downloadSpecular();
   std::vector<float> downloadNormal();
   std::vector<uint32_t> downloadSegmentation();
   std::vector<float> downloadDepth();

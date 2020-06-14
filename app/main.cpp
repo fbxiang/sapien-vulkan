@@ -163,14 +163,39 @@ int main() {
     }
     device.waitIdle();
 
-    // auto now = high_resolution_clock::now();
-    // auto albedo = renderer->downloadAlbedo();
-    // std::vector<uint8_t> img(albedo.size());
-    // for (uint32_t i = 0; i < albedo.size(); ++i) {
-    //   img[i] = static_cast<uint8_t>(std::clamp(albedo[i] * 255, 0.f, 255.f));
-    // }
-    // std::cout << "Elapsed time: " << duration_cast<milliseconds>(high_resolution_clock::now() - now).count() << std::endl;
-    // stbi_write_png("test.png", 800, 600, 4, img.data(), 4 * 800);
+    {
+      auto albedo = renderer->downloadAlbedo();
+      std::vector<uint8_t> img(albedo.size());
+      for (uint32_t i = 0; i < albedo.size(); ++i) {
+        img[i] = static_cast<uint8_t>(std::clamp(albedo[i] * 255, 0.f, 255.f));
+      }
+      stbi_write_png("albedo.png", 800, 600, 4, img.data(), 4 * 800);
+    }
+    {
+      auto normal = renderer->downloadNormal();
+      std::vector<uint8_t> img(normal.size());
+      for (uint32_t i = 0; i < normal.size(); ++i) {
+        img[i] = static_cast<uint8_t>(std::clamp(normal[i] * 255, 0.f, 255.f));
+      }
+      stbi_write_png("normal.png", 800, 600, 4, img.data(), 4 * 800);
+    }
+    {
+      auto position = renderer->downloadPosition();
+      std::vector<uint8_t> img(position.size());
+      for (uint32_t i = 0; i < position.size(); ++i) {
+        img[i] = static_cast<uint8_t>(std::clamp(position[i] * 255, 0.f, 255.f));
+      }
+      stbi_write_png("position.png", 800, 600, 4, img.data(), 4 * 800);
+    }
+    {
+      auto depth = renderer->downloadDepth();
+      std::vector<uint8_t> img(depth.size());
+      for (uint32_t i = 0; i < depth.size(); ++i) {
+        img[i] = static_cast<uint8_t>(std::clamp(depth[i] * 255, 0.f, 255.f));
+      }
+      stbi_write_png("depth.png", 800, 600, 1, img.data(), 800);
+    }
+
 
     if (vwindow.isKeyDown('q')) {
       glfwSetWindowShouldClose(context.getWindow(), true);
