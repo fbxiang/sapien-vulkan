@@ -18,15 +18,14 @@ endif ()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(assimp REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(glfw3 REQUIRED)
 file(GLOB_RECURSE RENDER_SRC "src/*.cpp")
 
 set(ON_SCREEN TRUE CACHE BOOL "Build with on screen rendering support")
 
 include_directories("src")
-include_directories("3rd_party/glfw/include")
 
 if (${ON_SCREEN}) 
-    add_subdirectory("3rd_party/glfw")
     add_definitions(-DON_SCREEN)
     include_directories("3rd_party/imgui" "3rd_party/imgui/examples")
     file(GLOB GUI_SRC "3rd_party/imgui/*.cpp"
