@@ -1,6 +1,6 @@
 #pragma once
 #include "vulkan_material.h"
-#include "common/vulkan.h"
+#include "vulkan.h"
 
 namespace svulkan
 {

@@ -2,7 +2,7 @@
 #include "light.h"
 #include "uniform_buffers.h"
 #include "object.h"
-#include "vulkan_scene.h"
+#include "internal/vulkan_scene.h"
 
 namespace svulkan
 {

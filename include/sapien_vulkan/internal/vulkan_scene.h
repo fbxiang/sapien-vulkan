@@ -1,6 +1,6 @@
 #pragma once
-#include "common/vulkan.h"
-#include "uniform_buffers.h"
+#include "vulkan.h"
+#include "sapien_vulkan/uniform_buffers.h"
 
 namespace svulkan
 {

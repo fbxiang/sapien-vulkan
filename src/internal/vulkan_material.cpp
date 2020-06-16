@@ -1,4 +1,4 @@
-#include "vulkan_material.h"
+#include "sapien_vulkan/internal/vulkan_material.h"
 
 namespace svulkan
 {

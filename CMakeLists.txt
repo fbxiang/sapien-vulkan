@@ -18,19 +18,20 @@ endif ()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(assimp REQUIRED)
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
 file(GLOB_RECURSE RENDER_SRC "src/*.cpp")
 
 set(ON_SCREEN TRUE CACHE BOOL "Build with on screen rendering support")
 
-include_directories("src")
+include_directories("include")
 
 if (${ON_SCREEN}) 
+    find_package(glfw3 REQUIRED)
     add_definitions(-DON_SCREEN)
     include_directories("3rd_party/imgui" "3rd_party/imgui/examples")
     file(GLOB GUI_SRC "3rd_party/imgui/*.cpp"
         "3rd_party/imgui/examples/imgui_impl_glfw.cpp"
         "3rd_party/imgui/examples/imgui_impl_vulkan.cpp" )
+    set(GLFW_LIBRARIES glfw)
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/spv)
@@ -40,7 +41,7 @@ add_custom_target(glsl
     )
 
 add_library(sapien-vulkan ${RENDER_SRC} ${GUI_SRC})
-target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} glfw Vulkan::Vulkan spdlog stdc++fs)
+target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} ${GLFW_LIBRARIES} Vulkan::Vulkan spdlog stdc++fs)
 add_dependencies(sapien-vulkan glsl)
 
 add_executable(main app/main.cpp)

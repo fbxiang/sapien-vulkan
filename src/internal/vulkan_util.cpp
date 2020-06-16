@@ -1,6 +1,6 @@
-#include "vulkan_util.h"
-#include "fs.h"
-#include "vulkan_texture.h"
+#include "sapien_vulkan/internal/vulkan_util.h"
+#include "sapien_vulkan/common/fs.h"
+#include "sapien_vulkan/internal/vulkan_texture.h"
 #include <numeric>
 
 namespace svulkan {

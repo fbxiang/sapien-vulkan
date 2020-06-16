@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.hpp>
 #endif
 
-#include "common/glm_common.h"
+#include "sapien_vulkan/common/glm_common.h"
 
 namespace svulkan
 {
@@ -95,7 +95,8 @@ class VulkanContext {
   void initializeDescriptorSetLayouts();
   inline DescriptorSetLayouts const& getDescriptorSetLayouts() const { return mDescriptorSetLayouts; }
 
-  std::vector<std::unique_ptr<Object>> loadObjects(std::string const &file, float scale = 1.f,
+  std::vector<std::unique_ptr<Object>> loadObjects(std::string const &file,
+                                                   glm::vec3 scale = {1.f, 1.f, 1.f},
                                                    bool ignoreRootTransform = true,
                                                    glm::vec3 const &up = {0,1,0},
                                                    glm::vec3 const &forward = {0,0, -1});

@@ -1,6 +1,6 @@
-#include "deferred.h"
-#include "vulkan_context.h"
-#include "uniform_buffers.h"
+#include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/internal/vulkan_context.h"
+#include "sapien_vulkan/uniform_buffers.h"
 
 namespace svulkan
 {

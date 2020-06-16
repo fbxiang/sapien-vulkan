@@ -1,4 +1,4 @@
-#include "scene.h"
+#include "sapien_vulkan/scene.h"
 
 namespace svulkan
 {

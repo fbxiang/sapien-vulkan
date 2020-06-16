@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/glm_common.h"
-#include "common/vulkan.h"
-#include "uniform_buffers.h"
+#include "sapien_vulkan/common/glm_common.h"
+#include "vulkan.h"
+#include "sapien_vulkan/uniform_buffers.h"
 #include <array>
 
 namespace svulkan

@@ -1,6 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
-#include "log.h"
+#include "sapien_vulkan/common/log.h"
 
 namespace svulkan {
 /** Load shader file to create shader module

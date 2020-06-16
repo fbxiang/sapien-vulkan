@@ -1,7 +1,8 @@
 #pragma once
 #include "common/glm_common.h"
 #include <memory>
-#include "vulkan_object.h"
+#include "internal/vulkan_object.h"
+#include <vector>
 
 namespace svulkan 
 {

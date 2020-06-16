@@ -1,19 +1,18 @@
-#include "vulkan_context.h"
-#include "vulkan_renderer.h"
-#include "scene.h"
-#include "common/log.h"
-#include "pass/gbuffer.h"
-#include "pass/deferred.h"
-#include "camera.h"
-#include "camera_controller.h"
+#include "sapien_vulkan/internal/vulkan_context.h"
+#include "sapien_vulkan/internal/vulkan_renderer.h"
+#include "sapien_vulkan/scene.h"
+#include "sapien_vulkan/common/log.h"
+#include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/camera.h"
+#include "sapien_vulkan/camera_controller.h"
 
-#include "gui/gui.hpp"
+#include "sapien_vulkan/gui/gui.hpp"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "common/stb_image_write.h"
+#include "sapien_vulkan/common/stb_image_write.h"
 
 #include <chrono>
-using namespace std::chrono;
 
 using namespace svulkan;
 
@@ -45,7 +44,7 @@ void LoadCube(VulkanContext &context, Scene &scene) {
 }
 
 void LoadRoom(VulkanContext &context, Scene &scene) {
-  auto objs = context.loadObjects("/home/fx/Scenes/conference/conference.obj", 0.01f);
+  auto objs = context.loadObjects("/home/fx/Scenes/conference/conference.obj", {0.001f, 0.001f, 0.001f});
   for (auto &obj : objs) {
     scene.addObject(std::move(obj));
   }
@@ -59,7 +58,7 @@ void LoadSponza(VulkanContext &context, Scene &scene) {
   scene.addPointLight({{  0, 0.3, 0,1}, {0,1,0,1}});
   scene.addPointLight({{-0.5, 0.3, 0,1}, {0,0,1,1}});
 
-  auto objs = context.loadObjects("/home/fx/Scenes/sponza/sponza.obj", 0.001f);
+  auto objs = context.loadObjects("/home/fx/Scenes/sponza/sponza.obj", {0.001f, 0.001f, 0.001f});
   for (auto &obj : objs) {
     scene.addObject(std::move(obj));
   }
@@ -70,8 +69,6 @@ int main() {
   auto device = context.getDevice();
   auto renderer = context.createVulkanRenderer();
   auto scene = Scene(context.createVulkanScene());
-  // LoadCube(context, scene);
-  // LoadRoom(context, scene);
   LoadSponza(context, scene);
 
   auto camera = context.createCamera();
@@ -163,38 +160,38 @@ int main() {
     }
     device.waitIdle();
 
-    {
-      auto albedo = renderer->downloadAlbedo();
-      std::vector<uint8_t> img(albedo.size());
-      for (uint32_t i = 0; i < albedo.size(); ++i) {
-        img[i] = static_cast<uint8_t>(std::clamp(albedo[i] * 255, 0.f, 255.f));
-      }
-      stbi_write_png("albedo.png", 800, 600, 4, img.data(), 4 * 800);
-    }
-    {
-      auto normal = renderer->downloadNormal();
-      std::vector<uint8_t> img(normal.size());
-      for (uint32_t i = 0; i < normal.size(); ++i) {
-        img[i] = static_cast<uint8_t>(std::clamp(normal[i] * 255, 0.f, 255.f));
-      }
-      stbi_write_png("normal.png", 800, 600, 4, img.data(), 4 * 800);
-    }
-    {
-      auto position = renderer->downloadPosition();
-      std::vector<uint8_t> img(position.size());
-      for (uint32_t i = 0; i < position.size(); ++i) {
-        img[i] = static_cast<uint8_t>(std::clamp(position[i] * 255, 0.f, 255.f));
-      }
-      stbi_write_png("position.png", 800, 600, 4, img.data(), 4 * 800);
-    }
-    {
-      auto depth = renderer->downloadDepth();
-      std::vector<uint8_t> img(depth.size());
-      for (uint32_t i = 0; i < depth.size(); ++i) {
-        img[i] = static_cast<uint8_t>(std::clamp(depth[i] * 255, 0.f, 255.f));
-      }
-      stbi_write_png("depth.png", 800, 600, 1, img.data(), 800);
-    }
+    // {
+    //   auto albedo = renderer->downloadAlbedo();
+    //   std::vector<uint8_t> img(albedo.size());
+    //   for (uint32_t i = 0; i < albedo.size(); ++i) {
+    //     img[i] = static_cast<uint8_t>(std::clamp(albedo[i] * 255, 0.f, 255.f));
+    //   }
+    //   stbi_write_png("albedo.png", 800, 600, 4, img.data(), 4 * 800);
+    // }
+    // {
+    //   auto normal = renderer->downloadNormal();
+    //   std::vector<uint8_t> img(normal.size());
+    //   for (uint32_t i = 0; i < normal.size(); ++i) {
+    //     img[i] = static_cast<uint8_t>(std::clamp(normal[i] * 255, 0.f, 255.f));
+    //   }
+    //   stbi_write_png("normal.png", 800, 600, 4, img.data(), 4 * 800);
+    // }
+    // {
+    //   auto position = renderer->downloadPosition();
+    //   std::vector<uint8_t> img(position.size());
+    //   for (uint32_t i = 0; i < position.size(); ++i) {
+    //     img[i] = static_cast<uint8_t>(std::clamp(position[i] * 255, 0.f, 255.f));
+    //   }
+    //   stbi_write_png("position.png", 800, 600, 4, img.data(), 4 * 800);
+    // }
+    // {
+    //   auto depth = renderer->downloadDepth();
+    //   std::vector<uint8_t> img(depth.size());
+    //   for (uint32_t i = 0; i < depth.size(); ++i) {
+    //     img[i] = static_cast<uint8_t>(std::clamp(depth[i] * 255, 0.f, 255.f));
+    //   }
+    //   stbi_write_png("depth.png", 800, 600, 1, img.data(), 800);
+    // }
 
 
     if (vwindow.isKeyDown('q')) {

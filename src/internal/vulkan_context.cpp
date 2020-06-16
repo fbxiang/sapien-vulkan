@@ -1,21 +1,21 @@
-#include "vulkan_context.h"
-#include "common/vulkan.h"
+#include "sapien_vulkan/internal/vulkan_context.h"
+#include "sapien_vulkan/internal/vulkan.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
-#include "vulkan_material.h"
-#include "vulkan_object.h"
-#include "object.h"
-#include "vulkan_scene.h"
+#include "sapien_vulkan/internal/vulkan_material.h"
+#include "sapien_vulkan/internal/vulkan_object.h"
+#include "sapien_vulkan/object.h"
+#include "sapien_vulkan/internal/vulkan_scene.h"
 #include <iostream>
-#include "vulkan_renderer.h"
-#include "pass/gbuffer.h"
-#include "pass/deferred.h"
-#include "camera.h"
-#include "common/vulkan_texture.h"
+#include "sapien_vulkan/internal/vulkan_renderer.h"
+#include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/camera.h"
+#include "sapien_vulkan/internal/vulkan_texture.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "common/stb_image.h"
+#include "sapien_vulkan/common/stb_image.h"
 
 namespace svulkan
 {
@@ -235,9 +235,12 @@ static float shininessToRoughness(float ns) {
   return 1.f - (std::sqrt(ns - 5.f) * 0.025f);
 }
 
-std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string const &file, float scale,
-                                                 bool ignoreRootTransform,
-                                                 glm::vec3 const &up, glm::vec3 const &forward) {
+std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string const &file,
+                                                                glm::vec3 scale,
+                                                                bool ignoreRootTransform,
+                                                                glm::vec3 const &up,
+                                                                glm::vec3 const &forward) {
+
   glm::mat3 formatTransform = glm::mat3(glm::cross(forward, up), up, -forward);
   std::vector<std::unique_ptr<Object>> objects;
   Assimp::Importer importer;
@@ -329,7 +332,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       glm::vec3 normal = glm::vec3(0);
       glm::vec2 texcoord = glm::vec2(0);
       glm::vec3 position = formatTransform *
-                           glm::vec3(mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z) * scale;
+                           glm::vec3(mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z);
       glm::vec3 tangent = glm::vec3(0);
       glm::vec3 bitangent = glm::vec3(0);
       if (mesh->HasNormals()) {
@@ -367,6 +370,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
     vobj->setMesh(vulkanMesh);
     vobj->setMaterial(mats[mesh->mMaterialIndex]);
     std::unique_ptr<Object> object = std::make_unique<Object>(std::move(vobj));
+    object->mTransform.scale = scale;
     objects.push_back(std::move(object));
   }
   return objects;

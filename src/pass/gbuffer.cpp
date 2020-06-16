@@ -1,5 +1,5 @@
-#include "gbuffer.h"
-#include "vulkan_context.h"
+#include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/internal/vulkan_context.h"
 
 namespace svulkan
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include "common/vulkan.h"
+#include "vulkan.h"
 
 namespace svulkan
 {

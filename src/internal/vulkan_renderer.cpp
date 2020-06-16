@@ -1,9 +1,9 @@
-#include "vulkan_renderer.h"
-#include "pass/gbuffer.h"
-#include "pass/deferred.h"
-#include "vulkan_context.h"
-#include "scene.h"
-#include "camera.h"
+#include "sapien_vulkan/internal/vulkan_renderer.h"
+#include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/internal/vulkan_context.h"
+#include "sapien_vulkan/scene.h"
+#include "sapien_vulkan/camera.h"
 
 namespace svulkan {
 

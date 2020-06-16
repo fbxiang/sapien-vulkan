@@ -1,6 +1,6 @@
 #pragma once
 #include "common/glm_common.h"
-#include "common/vulkan.h"
+#include "internal/vulkan.h"
 #include "uniform_buffers.h"
 
 namespace svulkan

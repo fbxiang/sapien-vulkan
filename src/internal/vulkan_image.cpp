@@ -1,4 +1,4 @@
-#include "vulkan_image.h"
+#include "sapien_vulkan/internal/vulkan_image.h"
 
 namespace svulkan
 {

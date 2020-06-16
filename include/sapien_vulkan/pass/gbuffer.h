@@ -1,11 +1,11 @@
 #pragma once
-#include "common/vulkan.h"
+#include "sapien_vulkan/internal/vulkan.h"
 
 namespace svulkan
 {
 class VulkanContext;
 
-class DeferredPass {
+class GBufferPass {
 
   VulkanContext *mContext;
   vk::UniqueRenderPass mRenderPass;
@@ -14,17 +14,21 @@ class DeferredPass {
   vk::UniqueFramebuffer mFramebuffer;
 
  public:
-  DeferredPass(VulkanContext &context);
+  GBufferPass(VulkanContext &context);
 
-  DeferredPass(DeferredPass const &other) = delete;
-  DeferredPass &operator=(DeferredPass const &other) = delete;
+  GBufferPass(GBufferPass const &other) = delete;
+  GBufferPass &operator=(GBufferPass const &other) = delete;
 
-  DeferredPass(DeferredPass &&other) = default;
-  DeferredPass&operator=(DeferredPass &&other) = default;
+  GBufferPass(GBufferPass &&other) = default;
+  GBufferPass &operator=(GBufferPass &&other) = default;
 
   void initializePipeline(std::vector<vk::DescriptorSetLayout> const &layouts,
-                          std::vector<vk::Format> const &outputFormats);
-  void initializeFramebuffer(std::vector<vk::ImageView> const& outputImageViews,
+                          std::vector<vk::Format> const &colorFormats,
+                          vk::Format depthFormat,
+                          vk::CullModeFlags cullMode,
+                          vk::FrontFace frontFace);
+  void initializeFramebuffer(std::vector<vk::ImageView> const&colorImageViews,
+                             vk::ImageView depthImageView,
                              vk::Extent2D const &extent);
 
   inline vk::Framebuffer getFramebuffer() {
@@ -42,4 +46,3 @@ class DeferredPass {
 };
 
 }
-#include "common/vulkan.h"
