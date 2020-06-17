@@ -236,7 +236,7 @@ static float shininessToRoughness(float ns) {
   return 1.f - (std::sqrt(ns - 5.f) * 0.025f);
 }
 
-std::unique_ptr<Object> VulkanContext::loadCube(glm::vec3 halfExtens) {
+std::unique_ptr<Object> VulkanContext::loadCube() {
   std::vector vertices = FlatCubeVertices;
   std::vector indices = FlatCubeIndices;
   static std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
@@ -251,11 +251,10 @@ std::unique_ptr<Object> VulkanContext::loadCube(glm::vec3 halfExtens) {
   vobj->setMaterial(mat);
 
   auto obj = std::make_unique<Object>(std::move(vobj));
-  obj->mTransform.scale = halfExtens;
   return obj;
 }
 
-std::unique_ptr<Object> VulkanContext::loadSphere(float radius) {
+std::unique_ptr<Object> VulkanContext::loadSphere() {
   static std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
   if (!vulkanMesh) {
     std::vector<Vertex> vertices;
@@ -304,14 +303,107 @@ std::unique_ptr<Object> VulkanContext::loadSphere(float radius) {
   vobj->setMaterial(mat);
 
   auto obj = std::make_unique<Object>(std::move(vobj));
-  obj->mTransform.scale = {radius, radius, radius};
   return obj;
 }
 
-// std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLength) {
-// }
+std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLength) {
+  std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+  uint32_t stacks = 20;
+  uint32_t slices = 20;
 
-std::unique_ptr<Object> VulkanContext::loadYZPlane(glm::vec2 halfExtents) {
+  // lower hemisphere
+  for (uint32_t i = 0; i <= stacks / 2; ++i) {
+    float phi = glm::pi<float>() / stacks * i - glm::pi<float>() / 2;
+    for (uint32_t j = 0; j < slices; ++j) {
+      float theta = glm::pi<float>() * 2 / slices * j;
+      float x = sinf(phi);
+      float y = cosf(theta) * cosf(phi);
+      float z = sinf(theta) * cosf(phi);
+      vertices.push_back({{radius * x - halfLength, radius * y, radius * z}, {x, y, z}});
+    }
+  }
+
+  for (uint32_t i = 0; i < (stacks / 2) * slices; ++i) {
+    uint32_t right = (i + 1) % slices + i / slices * slices;
+    uint32_t up = i + slices;
+    uint32_t rightUp = right + slices;
+
+    if (i >= slices) {
+      indices.push_back(i);
+      indices.push_back(right);
+      indices.push_back(rightUp);
+    }
+
+    indices.push_back(i);
+    indices.push_back(rightUp);
+    indices.push_back(up);
+  }
+
+  // upper hemisphere
+  for (uint32_t i = stacks / 2; i <= stacks; ++i) {
+    float phi = glm::pi<float>() / stacks * i - glm::pi<float>() / 2;
+    for (uint32_t j = 0; j < slices; ++j) {
+      float theta = glm::pi<float>() * 2 / slices * j;
+      float x = sinf(phi);
+      float y = cosf(theta) * cosf(phi);
+      float z = sinf(theta) * cosf(phi);
+      vertices.push_back({{radius * x + halfLength, radius * y, radius * z}, {x, y, z}});
+    }
+  }
+
+  for (uint32_t i = (stacks / 2 + 1) * slices; i < (stacks + 1) * slices; ++i) {
+    uint32_t right = (i + 1) % slices + i / slices * slices;
+    uint32_t up = i + slices;
+    uint32_t rightUp = right + slices;
+
+    indices.push_back(i);
+    indices.push_back(right);
+    indices.push_back(rightUp);
+
+    if (i < stacks * slices) {
+      indices.push_back(i);
+      indices.push_back(rightUp);
+      indices.push_back(up);
+    }
+  }
+
+  // cylinder
+  uint32_t start = vertices.size() / 2 - slices, end = vertices.size() / 2 + slices;
+  uint32_t idx = vertices.size();
+  for (uint32_t i = start; i < end; ++i) {
+    vertices.push_back(vertices[i]);
+  }
+  for (uint32_t i = idx; i < idx + slices; ++i) {
+    uint32_t right = (i + 1) % slices + idx;
+    uint32_t up = i + slices;
+    uint32_t rightUp = right + slices;
+    
+    indices.push_back(i);
+    indices.push_back(right);
+    indices.push_back(rightUp);
+
+    indices.push_back(i);
+    indices.push_back(rightUp);
+    indices.push_back(up);
+  }
+
+  vulkanMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                            getGraphicsQueue(), vertices, indices, false);
+
+  std::unique_ptr<VulkanObject> vobj =
+      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
+                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  vobj->setMesh(vulkanMesh);
+  std::shared_ptr<VulkanMaterial> mat = createMaterial();
+  vobj->setMaterial(mat);
+
+  auto obj = std::make_unique<Object>(std::move(vobj));
+  return obj;
+}
+
+std::unique_ptr<Object> VulkanContext::loadYZPlane() {
   static std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
 
   if (!vulkanMesh)
@@ -334,7 +426,6 @@ std::unique_ptr<Object> VulkanContext::loadYZPlane(glm::vec2 halfExtents) {
   vobj->setMaterial(mat);
 
   auto obj = std::make_unique<Object>(std::move(vobj));
-  obj->mTransform.scale = glm::vec3{1, halfExtents};
   return obj;
 }
 

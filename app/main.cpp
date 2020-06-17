@@ -7,7 +7,7 @@
 #include "sapien_vulkan/camera.h"
 #include "sapien_vulkan/camera_controller.h"
 
-#include "sapien_vulkan/gui/gui.hpp"
+#include "sapien_vulkan/gui/gui.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "sapien_vulkan/common/stb_image_write.h"
@@ -67,7 +67,10 @@ void LoadSponza(VulkanContext &context, Scene &scene) {
 void LoadCustom(VulkanContext &context, Scene &scene) {
   // scene.addObject(context.loadCube({0.1, 0.1, 0.1}));
   // scene.addObject(context.loadSphere(0.1));
-  scene.addObject(context.loadYZPlane({1, 1}));
+  // scene.addObject(context.loadYZPlane({1, 1}));
+  auto obj = context.loadCapsule(0.1, 0.1);
+  obj->mTransform.position = {0, 1, 0};
+  scene.addObject(std::move(obj));
 }
 
 int main() {

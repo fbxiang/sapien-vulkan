@@ -19,10 +19,14 @@ glm::mat4 Object::getModelMat() const {
 void Object::updateVulkanObject() {
   if (mVulkanObject) {
     copyToDevice<ObjectUBO>(mVulkanObject->mDevice, mVulkanObject->mUBO.mMemory.get(),
-                            {mGlobalModelMatrixCache, {mSegmentId, 0, 0, 0}});
+                            {mGlobalModelMatrixCache, {mObjectId, mSegmentId, 0, 0}});
   }
 }
 
 void Object::addChild(std::unique_ptr<Object> child) { mChildren.push_back(std::move(child)); }
+
+void Object::updateMaterial(PBRMaterialUBO material) {
+  mVulkanObject->mMaterial->setProperties(material);
+}
 
 }

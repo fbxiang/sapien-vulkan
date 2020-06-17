@@ -12,7 +12,8 @@ class Object
   std::unique_ptr<VulkanObject> mVulkanObject = nullptr;
   Object *mParent = nullptr;
   std::vector<std::unique_ptr<Object>> mChildren = {};
-  uint32_t mSegmentId = 0u;
+  uint32_t mObjectId = 0u;  // unique id for this object
+  uint32_t mSegmentId = 0u;  // custom id
 
   class Scene *mScene = nullptr;
 
@@ -44,9 +45,6 @@ class Object
 
   void addChild(std::unique_ptr<Object> child);
 
-  inline void setSegmentId(uint32_t id) { mSegmentId = id; }
-  inline uint32_t getSegmentId() { return mSegmentId; }
-
   void updateVulkanObject();
 
   inline VulkanObject *getVulkanObject() { return mVulkanObject.get(); }
@@ -55,6 +53,14 @@ class Object
 
   inline void markForRemove() { mMarkedForRemove = true; }
   inline bool isMarkedForRemove() const { return mMarkedForRemove; }
+
+  inline void setObjectId(uint32_t id) { mObjectId = id; }
+  inline uint32_t getObjectId() { return mObjectId; }
+
+  inline void setSegmentId(uint32_t id) { mSegmentId = id; }
+  inline uint32_t getSegmentId() { return mSegmentId; }
+
+  void updateMaterial(PBRMaterialUBO material);
 };
 
 }
