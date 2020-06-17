@@ -146,12 +146,12 @@ void main() {
   if (depth == 1) {
     outColor = vec4(getBackgroundColor((cameraUBO.viewMatrixInverse * csPosition).xyz), 1.f);
   } else {
-    outColor = vec4(color, 1);
+    // outColor = vec4(color, 1);
+    // outColor = vec4(albedo, 1);
   }
 
-  // outColor = vec4(abs(normal), 1);
+  outColor = vec4(abs(normal), 1);
   // outColor = vec4(depth, depth, depth, 1);
-  // outColor = vec4(normal, 1);
   // outColor = vec4(csPosition.xy, 0, 1);
   // outColor = vec4(wsPosition.xyz, 1);
   // outColor = vec4(wsNormal, 1);

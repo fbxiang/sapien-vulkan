@@ -101,6 +101,11 @@ class VulkanContext {
                                                    glm::vec3 const &up = {0,1,0},
                                                    glm::vec3 const &forward = {0,0, -1});
 
+  std::unique_ptr<Object> loadSphere(float radius);
+  std::unique_ptr<Object> loadCube(glm::vec3 halfExtens);
+  std::unique_ptr<Object> loadCapsule(float radius, float halfLength);
+  std::unique_ptr<Object> loadYZPlane(glm::vec2 halfExtens);
+
   std::shared_ptr<class VulkanMaterial> createMaterial();
   std::unique_ptr<class VulkanScene> createVulkanScene() const;
   std::unique_ptr<struct VulkanObject> createVulkanObject() const;

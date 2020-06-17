@@ -17,23 +17,6 @@ layout(set = 3, binding = 2) uniform sampler2D specularTexture;
 layout(set = 3, binding = 3) uniform sampler2D normalTexture;
 layout(set = 3, binding = 4) uniform sampler2D heightTexture;
 
-// struct PointLight {
-//   vec4 position;
-//   vec4 emission;
-// };
-
-// struct DirectionalLight {
-//   vec4 direction;
-//   vec4 emission;
-// };
-
-// #define MAX_DIRECTIONAL_LIGHTS 10
-// #define MAX_POINT_LIGHTS 100
-// layout(binding = 0, set = 3) uniform SceneUBO {
-//   DirectionalLight directionalLights[MAX_DIRECTIONAL_LIGHTS];
-//   PointLight pointLights[MAX_POINT_LIGHTS];
-// } sceneUBO;
-
 layout(location = 0) in vec4 inPosition;
 layout(location = 1) in vec2 inUV;
 layout(location = 2) in flat uvec4 inSegmentation;
@@ -66,6 +49,6 @@ void main() {
   if (material.hasNormalTexture != 0) {
     outNormal = vec4(normalize(inTbn * texture(normalTexture, inUV).xyz), 0) * 0.5 + 0.5;
   } else {
-    outNormal = vec4(normalize(inTbn * vec3(0,0,1)), 0) * 0.5 + 0.5;
+    outNormal = vec4(normalize(inTbn * vec3(0, 0, 1)), 0) * 0.5 + 0.5;
   }
 }

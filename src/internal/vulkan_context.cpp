@@ -13,6 +13,7 @@
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/camera.h"
 #include "sapien_vulkan/internal/vulkan_texture.h"
+#include "sapien_vulkan/data/geometry.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "sapien_vulkan/common/stb_image.h"
@@ -235,6 +236,108 @@ static float shininessToRoughness(float ns) {
   return 1.f - (std::sqrt(ns - 5.f) * 0.025f);
 }
 
+std::unique_ptr<Object> VulkanContext::loadCube(glm::vec3 halfExtens) {
+  std::vector vertices = FlatCubeVertices;
+  std::vector indices = FlatCubeIndices;
+  static std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
+      getPhysicalDevice(), getDevice(), mCommandPool.get(),
+      getGraphicsQueue(), vertices, indices, false);
+
+  std::unique_ptr<VulkanObject> vobj =
+      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
+                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  vobj->setMesh(vulkanMesh);
+  std::shared_ptr<VulkanMaterial> mat = createMaterial();
+  vobj->setMaterial(mat);
+
+  auto obj = std::make_unique<Object>(std::move(vobj));
+  obj->mTransform.scale = halfExtens;
+  return obj;
+}
+
+std::unique_ptr<Object> VulkanContext::loadSphere(float radius) {
+  static std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
+  if (!vulkanMesh) {
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    uint32_t stacks = 20;
+    uint32_t slices = 20;
+
+    for (uint32_t i = 0; i <= stacks; ++i) {
+      float phi = glm::pi<float>() / stacks * i - glm::pi<float>() / 2;
+      for (uint32_t j = 0; j < slices; ++j) {
+        float theta = glm::pi<float>() * 2 / slices * j;
+        float x = sinf(phi);
+        float y = cosf(theta) * cosf(phi);
+        float z = sinf(theta) * cosf(phi);
+        vertices.push_back({{x, y, z}, {x, y, z}});
+      }
+    }
+
+    for (uint32_t i = 0; i < stacks * slices; ++i) {
+      uint32_t right = (i + 1) % slices + i / slices * slices;
+      uint32_t up = i + slices;
+      uint32_t rightUp = right + slices;
+
+      if (i >= slices) {
+        indices.push_back(i);
+        indices.push_back(right);
+        indices.push_back(rightUp);
+      }
+
+      if (i < (stacks-1) * slices) {
+        indices.push_back(i);
+        indices.push_back(rightUp);
+        indices.push_back(up);
+      }
+    }
+
+    vulkanMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                              getGraphicsQueue(), vertices, indices, false);
+  }
+
+  std::unique_ptr<VulkanObject> vobj =
+      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
+                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  vobj->setMesh(vulkanMesh);
+  std::shared_ptr<VulkanMaterial> mat = createMaterial();
+  vobj->setMaterial(mat);
+
+  auto obj = std::make_unique<Object>(std::move(vobj));
+  obj->mTransform.scale = {radius, radius, radius};
+  return obj;
+}
+
+// std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLength) {
+// }
+
+std::unique_ptr<Object> VulkanContext::loadYZPlane(glm::vec2 halfExtents) {
+  static std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
+
+  if (!vulkanMesh)
+  {
+    std::vector<Vertex> vertices = {{{0, -1, -1}, {1, 0, 0}, {0, 0}, {0, 1, 0}, {0, 0, 1}},
+                                    {{0, 1, -1}, {1, 0, 0}, {1, 0}, {0, 1, 0}, {0, 0, 1}},
+                                    {{0, -1, 1}, {1, 0, 0}, {0, 1}, {0, 1, 0}, {0, 0, 1}},
+                                    {{0, 1, 1}, {1, 0, 0}, {1, 1}, {0, 1, 0}, {0, 0, 1}}};
+    std::vector<uint32_t> indices = { 0, 1, 3, 0, 3, 2 };
+
+  vulkanMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                            getGraphicsQueue(), vertices, indices, false);
+  }
+
+  std::unique_ptr<VulkanObject> vobj =
+      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
+                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  vobj->setMesh(vulkanMesh);
+  std::shared_ptr<VulkanMaterial> mat = createMaterial();
+  vobj->setMaterial(mat);
+
+  auto obj = std::make_unique<Object>(std::move(vobj));
+  obj->mTransform.scale = glm::vec3{1, halfExtents};
+  return obj;
+}
+
 std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string const &file,
                                                                 glm::vec3 scale,
                                                                 bool ignoreRootTransform,
@@ -254,8 +357,9 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
     throw std::runtime_error("Failed to load scene: " + std::string(importer.GetErrorString()) + ", " + file);
   }
 
-  printf("Loaded %d meshes, %d materials, %d textures\n", scene->mNumMeshes, scene->mNumMaterials,
-         scene->mNumTextures);
+  // printf("Loaded %d meshes, %d materials, %d textures\n", scene->mNumMeshes, scene->mNumMaterials,
+  //        scene->mNumTextures);
+
   std::vector<std::shared_ptr<VulkanMaterial>> mats;
   for (uint32_t i = 0; i < scene->mNumMaterials; i++) {
     std::shared_ptr<VulkanMaterial> mat = createMaterial();
@@ -347,6 +451,15 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
         bitangent = formatTransform *
                     glm::vec3(mesh->mBitangents[v].x, mesh->mBitangents[v].y, mesh->mBitangents[v].z);
       }
+
+      // FIXME: remove
+      // printf("{{%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}},\n",
+      //        position.x, position.y, position.z,
+      //        normal.x, normal.y, normal.z,
+      //        texcoord.x, texcoord.y,
+      //        tangent.x, tangent.y, tangent.z,
+      //        bitangent.x, bitangent.y, bitangent.z);
+
       vertices.push_back({position, normal, texcoord, tangent, bitangent});
     }
     for (uint32_t f = 0; f < mesh->mNumFaces; f++) {
@@ -359,6 +472,12 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       indices.push_back(face.mIndices[1]);
       indices.push_back(face.mIndices[2]);
     }
+    
+    // FIXME: remove
+    // for (uint32_t i = 0; i < indices.size(); ++i) {
+    //   printf("%d,", indices[i]);
+    // }
+    // printf("\n");
 
     std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
         getPhysicalDevice(), getDevice(), mCommandPool.get(),
@@ -377,9 +496,11 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
 }
 
 std::shared_ptr<VulkanMaterial> VulkanContext::createMaterial() {
-  return std::make_shared<VulkanMaterial>(
+  auto mat = std::make_shared<VulkanMaterial>(
       getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.material.get(),
       getPlaceholderTexture());
+  mat->setProperties({});
+  return mat;
 }
 
 std::unique_ptr<VulkanScene> VulkanContext::createVulkanScene() const {

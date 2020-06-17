@@ -64,11 +64,18 @@ void LoadSponza(VulkanContext &context, Scene &scene) {
   }
 }
 
+void LoadCustom(VulkanContext &context, Scene &scene) {
+  // scene.addObject(context.loadCube({0.1, 0.1, 0.1}));
+  // scene.addObject(context.loadSphere(0.1));
+  scene.addObject(context.loadYZPlane({1, 1}));
+}
+
 int main() {
   VulkanContext context;
   auto device = context.getDevice();
   auto renderer = context.createVulkanRenderer();
   auto scene = Scene(context.createVulkanScene());
+  LoadCustom(context, scene);
   LoadSponza(context, scene);
 
   auto camera = context.createCamera();
