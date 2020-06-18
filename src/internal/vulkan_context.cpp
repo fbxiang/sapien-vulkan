@@ -18,6 +18,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "sapien_vulkan/common/stb_image.h"
 
+#ifdef ON_SCREEN
+#define GLFW_INCLUDE_VULKAN
+#include "GLFW/glfw3.h"
+#endif
+
+
 namespace svulkan
 {
 
@@ -25,9 +31,6 @@ VulkanContext::VulkanContext() {
   createInstance();
   pickPhysicalDevice();
   createLogicalDevice();
-#ifdef ON_SCREEN
-  createWindow();
-#endif
   createCommandPool();
   createDescriptorPool();
 
@@ -62,10 +65,9 @@ bool VulkanContext::checkValidationLayerSupport() {
 #endif
 
 void VulkanContext::createInstance() {
+
 #ifdef ON_SCREEN
-    glfwInit();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    mWindow = glfwCreateWindow(800, 600, "vulkan", nullptr, nullptr);
+  glfwInit();
 #endif
 
 #ifdef VK_VALIDATION
@@ -120,27 +122,7 @@ void VulkanContext::createLogicalDevice() {
                            deviceExtensions.size(), deviceExtensions.data()));
 }
 
-#ifdef ON_SCREEN
-void VulkanContext::createWindow() {
-  VkSurfaceKHR tmpSurface;
-  if (glfwCreateWindowSurface(*mInstance, mWindow, nullptr, &tmpSurface) != VK_SUCCESS) {
-    throw std::runtime_error("create window failed: cannot create GLFW window surface");
-  }
-  mSurface = vk::UniqueSurfaceKHR(tmpSurface);
-
-  if (!mPhysicalDevice.getSurfaceSupportKHR(graphicsQueueFamilyIndex, mSurface.get())) {
-    throw std::runtime_error("create window failed: graphics device does not have present capability");
-  }
-
-  presentQueueFamilyIndex = graphicsQueueFamilyIndex;
-}
-#endif
-
 vk::Queue VulkanContext::getGraphicsQueue() const { return mDevice->getQueue(graphicsQueueFamilyIndex, 0); }
-
-#ifdef ON_SCREEN
-vk::Queue VulkanContext::getPresentQueue() const { return mDevice->getQueue(presentQueueFamilyIndex, 0); }
-#endif
 
 void VulkanContext::createCommandPool() {
   mCommandPool = mDevice->createCommandPoolUnique(
@@ -611,6 +593,12 @@ std::unique_ptr<VulkanRenderer> VulkanContext::createVulkanRenderer() {
 std::unique_ptr<struct Camera> VulkanContext::createCamera() const {
   return std::make_unique<Camera>(
       getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().camera.get());
+}
+
+VulkanContext::~VulkanContext() {
+#ifdef ON_SCREEN
+  glfwTerminate();
+#endif
 }
 
 }

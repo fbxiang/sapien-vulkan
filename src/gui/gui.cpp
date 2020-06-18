@@ -4,10 +4,12 @@
 namespace svulkan
 {
 
-VulkanWindow::VulkanWindow(vk::Device device, vk::PhysicalDevice physicalDevice, vk::SurfaceKHR surface, 
-             std::vector<vk::Format> const &requestFormats, vk::ColorSpaceKHR requestColorSpace,
-             std::vector<vk::PresentModeKHR> const& requestModes, uint32_t minImageCount)
-    : mDevice(device), mPhysicalDevice(physicalDevice), mSurface(surface), mMinImageCount(minImageCount) {
+VulkanWindow::VulkanWindow(vk::Instance instance, vk::Device device, vk::PhysicalDevice physicalDevice,
+                           uint32_t graphicsQueueFamilyIndex,
+                           std::vector<vk::Format> const &requestFormats, vk::ColorSpaceKHR requestColorSpace,
+                           std::vector<vk::PresentModeKHR> const& requestModes, uint32_t minImageCount)
+    : mInstance(instance), mDevice(device), mPhysicalDevice(physicalDevice), mMinImageCount(minImageCount) {
+  createGlfwWindow(instance, graphicsQueueFamilyIndex);
   selectSurfaceFormat(requestFormats, requestColorSpace);
   selectPresentMode(requestModes);
 }
@@ -81,9 +83,7 @@ bool VulkanWindow::presentFrameWithImgui(vk::Queue graphicsQueue, vk::Queue pres
       1, &mSwapchain.get(), &mFrameIndex}) == vk::Result::eSuccess;
 }
 
-void VulkanWindow::initImgui(GLFWwindow *window, vk::Instance instance,
-                             uint32_t graphicsQueueFamilyIndex, vk::Queue graphicsQueue,
-                             vk::DescriptorPool descriptorPool, vk::CommandPool commandPool) {
+void VulkanWindow::initImgui(vk::DescriptorPool descriptorPool, vk::CommandPool commandPool) {
   mImguiRenderPass = createImguiRenderPass(mDevice, mSurfaceFormat.format);
 
   IMGUI_CHECKVERSION();
@@ -91,13 +91,13 @@ void VulkanWindow::initImgui(GLFWwindow *window, vk::Instance instance,
   ImGuiIO &io = ImGui::GetIO(); (void)io;
   ImGui::StyleColorsDark();
 
-  ImGui_ImplGlfw_InitForVulkan(window, true);
+  ImGui_ImplGlfw_InitForVulkan(mWindow, true);
   ImGui_ImplVulkan_InitInfo initInfo = {};
-  initInfo.Instance = instance;
+  initInfo.Instance = mInstance;
   initInfo.PhysicalDevice = mPhysicalDevice;
   initInfo.Device = mDevice;
-  initInfo.QueueFamily = graphicsQueueFamilyIndex;
-  initInfo.Queue = graphicsQueue;
+  initInfo.QueueFamily = mPresentQueueFamilyIndex;
+  initInfo.Queue = getGraphicsQueue();
 
   initInfo.PipelineCache = {};
   initInfo.DescriptorPool = descriptorPool;
@@ -107,7 +107,7 @@ void VulkanWindow::initImgui(GLFWwindow *window, vk::Instance instance,
   initInfo.CheckVkResultFn = checkVKResult;
   ImGui_ImplVulkan_Init(&initInfo, mImguiRenderPass.get());
 
-  OneTimeSubmit(mDevice, commandPool, graphicsQueue,
+  OneTimeSubmit(mDevice, commandPool, getGraphicsQueue(),
                 [](vk::CommandBuffer cb) { ImGui_ImplVulkan_CreateFontsTexture(cb); });
   log::info("Imgui initialized");
 }
@@ -121,7 +121,7 @@ void VulkanWindow::selectSurfaceFormat(std::vector<vk::Format> const &requestFor
   // separate Swapchain image and image view format Additionally several new color spaces were introduced with
   // Vulkan Spec v1.0.40, hence we must make sure that a format with the mostly available color space,
   // VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, is found and used.
-  auto avail_formats = mPhysicalDevice.getSurfaceFormatsKHR(mSurface);
+  auto avail_formats = mPhysicalDevice.getSurfaceFormatsKHR(mSurface.get());
   if (avail_formats.size() == 0) {
     throw std::runtime_error("No surface format is available");
   }
@@ -160,7 +160,7 @@ void VulkanWindow::selectPresentMode(std::vector<vk::PresentModeKHR> const &requ
 
   // Request a certain mode and confirm that it is available. If not use VK_PRESENT_MODE_FIFO_KHR which is
   // mandatory
-  auto avail_modes = mPhysicalDevice.getSurfacePresentModesKHR(mSurface);
+  auto avail_modes = mPhysicalDevice.getSurfacePresentModesKHR(mSurface.get());
 
   for (uint32_t request_i = 0; request_i < requestModes.size(); request_i++) {
     for (uint32_t avail_i = 0; avail_i < avail_modes.size(); avail_i++) {
@@ -179,7 +179,7 @@ void VulkanWindow::recreateSwapchain(uint32_t w, uint32_t h) {
     throw std::runtime_error("Invalid min image count specified");
   }
     
-  vk::SwapchainCreateInfoKHR info({}, mSurface, mMinImageCount,
+  vk::SwapchainCreateInfoKHR info({}, mSurface.get(), mMinImageCount,
                                   mSurfaceFormat.format, mSurfaceFormat.colorSpace,
                                   {w, h}, 1,
                                   vk::ImageUsageFlagBits::eColorAttachment |
@@ -188,7 +188,7 @@ void VulkanWindow::recreateSwapchain(uint32_t w, uint32_t h) {
                                   vk::SurfaceTransformFlagBitsKHR::eIdentity,
                                   vk::CompositeAlphaFlagBitsKHR::eOpaque,
                                   mPresentMode, VK_TRUE, mSwapchain.get());
-  auto cap = mPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface);
+  auto cap = mPhysicalDevice.getSurfaceCapabilitiesKHR(mSurface.get());
   if (info.minImageCount < cap.minImageCount) {
     info.minImageCount = cap.minImageCount;
   } else if (cap.maxImageCount != 0 && info.minImageCount > cap.maxImageCount) {
@@ -240,6 +240,48 @@ void VulkanWindow::recreateImguiResources(uint32_t queueFamily) {
   for (uint32_t i = 0; i < mFrameSemaphores.size(); ++i) {
     mFrameSemaphores[i].mImguiCompleteSemaphore = mDevice.createSemaphoreUnique({});
   }
+}
+
+void VulkanWindow::createGlfwWindow(vk::Instance instance, uint32_t graphicsQueueFamilyIndex) {
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  mWindow = glfwCreateWindow(800, 600, "vulkan", nullptr, nullptr);
+
+  VkSurfaceKHR tmpSurface;
+  
+  if (glfwCreateWindowSurface(instance, mWindow, nullptr, &tmpSurface) != VK_SUCCESS) {
+    throw std::runtime_error("create window failed: cannot create GLFW window surface");
+  }
+  mSurface = vk::UniqueSurfaceKHR(tmpSurface, instance);
+
+  if (!mPhysicalDevice.getSurfaceSupportKHR(graphicsQueueFamilyIndex, mSurface.get())) {
+    throw std::runtime_error("create window failed: graphics device does not have present capability");
+  }
+
+  mGraphicsQueueFamilyIndex = mPresentQueueFamilyIndex = graphicsQueueFamilyIndex;
+}
+
+void VulkanWindow::close() {
+  mClosed = true;
+  glfwSetWindowShouldClose(mWindow, true);
+
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+
+  mDevice.waitIdle();
+
+  mImguiRenderPass.reset();
+  mFrameSemaphores.clear();
+  mFrames.clear();
+  mSwapchain.reset();
+  mSurface.reset();
+}
+
+bool VulkanWindow::isClosed() {
+  return mClosed;
+}
+
+VulkanWindow::~VulkanWindow() {
+  glfwDestroyWindow(mWindow);
 }
 
 }

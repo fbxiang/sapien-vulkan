@@ -1,11 +1,6 @@
 #pragma once
 
-#ifdef ON_SCREEN
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
-#endif
-
 #include "sapien_vulkan/common/glm_common.h"
 
 namespace svulkan
@@ -24,23 +19,15 @@ class VulkanContext {
   vk::UniqueDescriptorPool mDescriptorPool;
 
   uint32_t graphicsQueueFamilyIndex;
-#ifdef ON_SCREEN
-  uint32_t presentQueueFamilyIndex;
-  vk::UniqueSurfaceKHR mSurface;
-  GLFWwindow *mWindow;
-#endif
 
   std::shared_ptr<struct VulkanTextureData> mPlaceholderTexture {nullptr};
 
  public:
   VulkanContext();
+  ~VulkanContext();
 
   /** Get the graphics queue */
   vk::Queue getGraphicsQueue() const;
-
-#ifdef ON_SCREEN
-  vk::Queue getPresentQueue() const;
-#endif
 
   inline uint32_t getGraphicsQueueFamilyIndex() { return graphicsQueueFamilyIndex; }
   inline vk::Instance getInstance() const { return mInstance.get(); }
@@ -49,19 +36,9 @@ class VulkanContext {
   inline vk::CommandPool getCommandPool() const { return mCommandPool.get(); }
   inline vk::DescriptorPool getDescriptorPool() const { return mDescriptorPool.get(); }
 
-#ifdef ON_SCREEN
-  inline uint32_t getPresentQueueFamilyIndex() { return presentQueueFamilyIndex; }
-  inline GLFWwindow *getWindow() const { return mWindow; }
-  inline vk::SurfaceKHR getSurface() const { return mSurface.get(); }
-#endif
-
  private:
 #ifdef VK_VALIDATION
   bool checkValidationLayerSupport();
-#endif
-
-#ifdef ON_SCREEN
-  void createWindow();
 #endif
 
   /** Create Vulkan instance */

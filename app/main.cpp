@@ -93,12 +93,10 @@ int main() {
   const vk::ColorSpaceKHR requestSurfaceColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
 
   VulkanWindow vwindow {
-    context.getDevice(), context.getPhysicalDevice(),
-    context.getSurface(), requestSurfaceImageFormat, requestSurfaceColorSpace};
+    context.getInstance(), context.getDevice(), context.getPhysicalDevice(),
+    context.getGraphicsQueueFamilyIndex(), requestSurfaceImageFormat, requestSurfaceColorSpace};
 
-  vwindow.initImgui(context.getWindow(), context.getInstance(),
-                    context.getGraphicsQueueFamilyIndex(), context.getGraphicsQueue(),
-                    context.getDescriptorPool(), context.getCommandPool());
+  vwindow.initImgui(context.getDescriptorPool(), context.getCommandPool());
 
   vwindow.recreateSwapchain(800, 600);
   vwindow.recreateImguiResources(context.getGraphicsQueueFamilyIndex());
@@ -113,9 +111,9 @@ int main() {
                                                                    context.getCommandPool(),
                                                                    vk::CommandBufferLevel::ePrimary);
 
-  glfwSetWindowSizeCallback(context.getWindow(), glfw_resize_callback);
+  glfwSetWindowSizeCallback(vwindow.getWindow(), glfw_resize_callback);
 
-  while (!glfwWindowShouldClose(context.getWindow())) {
+  while (!vwindow.isClosed()) {
 
     if (gSwapchainRebuild) {
       gSwapchainRebuild = false;
@@ -163,7 +161,7 @@ int main() {
 
     vk::PresentInfoKHR info(1, &sceneRenderSemaphore.get(), 1, &swapchain, &fidx);
     try {
-      vwindow.presentFrameWithImgui(context.getGraphicsQueue(), context.getPresentQueue(),
+      vwindow.presentFrameWithImgui(context.getGraphicsQueue(), vwindow.getPresentQueue(),
                                     sceneRenderSemaphore.get(), sceneRenderFence.get());
     } catch (vk::OutOfDateKHRError &e) {
       gSwapchainRebuild = true;
@@ -205,7 +203,7 @@ int main() {
 
 
     if (vwindow.isKeyDown('q')) {
-      glfwSetWindowShouldClose(context.getWindow(), true);
+      vwindow.close();
     }
 
     if (vwindow.isMouseKeyDown(1)) {
@@ -227,11 +225,8 @@ int main() {
     if (vwindow.isKeyDown('d')) {
       cameraController.move(0, -r, 0);
     }
-
   }
   device.waitIdle();
 
-  glfwDestroyWindow(context.getWindow());
-  glfwTerminate();
   log::info("Finish");
 }
