@@ -21,6 +21,7 @@ find_package(Vulkan REQUIRED)
 file(GLOB_RECURSE RENDER_SRC "src/*.cpp")
 
 set(ON_SCREEN TRUE CACHE BOOL "Vulkan renderer with on screen rendering") 
+set(COMPILE_SPV_SHADER FALSE CACHE BOOL "True to recompile the SPV shaders")
 include_directories("include")
 
 if (${ON_SCREEN}) 
@@ -34,10 +35,15 @@ if (${ON_SCREEN})
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/spv)
+
+if (COMPILE_SPV_SHADER)
 add_custom_target(glsl
     COMMAND glslc -c ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.vert ${CMAKE_CURRENT_SOURCE_DIR}/glsl/*.frag
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/spv
     )
+else()
+    add_custom_target(glsl COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/spv/* ${CMAKE_BINARY_DIR}/spv)
+endif()
 
 add_library(sapien-vulkan ${RENDER_SRC} ${GUI_SRC})
 target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} ${GLFW_LIBRARIES} Vulkan::Vulkan spdlog stdc++fs)
