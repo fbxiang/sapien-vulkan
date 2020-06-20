@@ -27,17 +27,19 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device, std::vector<vk::
       1, &subpassDescription});
 }
 
-static vk::UniquePipeline createGraphicsPipeline(vk::Device device, uint32_t numColorAttachments,
-                                                 vk::PipelineLayout pipelineLayout,
-                                                 vk::RenderPass renderPass) {
+static vk::UniquePipeline createGraphicsPipeline(
+    std::string const &shaderDir,
+    vk::Device device, uint32_t numColorAttachments,
+    vk::PipelineLayout pipelineLayout,
+    vk::RenderPass renderPass) {
   vk::UniquePipelineCache pipelineCache = device.createPipelineCacheUnique({});
 
-  auto vsm = createShaderModule(device, "spv/deferred.vert.spv");
-  auto fsm = createShaderModule(device, "spv/deferred.frag.spv");
+  auto vsm = createShaderModule(device, shaderDir + "/deferred.vert.spv");
+  auto fsm = createShaderModule(device, shaderDir + "/deferred.frag.spv");
 
   // TODO: clean up light count handling
   std::vector<vk::SpecializationMapEntry> entries = { vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),
-    vk::SpecializationMapEntry(0, sizeof(uint32_t), sizeof(uint32_t)) };
+    vk::SpecializationMapEntry(1, sizeof(uint32_t), sizeof(uint32_t)) };
   std::vector<uint32_t> data = { NumDirectionalLights, NumPointLights };
   vk::SpecializationInfo specializationInfo(static_cast<uint32_t>(entries.size()), entries.data(),
                                             2 * sizeof(uint32_t), data.data());
@@ -101,6 +103,7 @@ static vk::UniquePipeline createGraphicsPipeline(vk::Device device, uint32_t num
 DeferredPass::DeferredPass(VulkanContext &context): mContext(&context) {}
 
 void DeferredPass::initializePipeline(
+    std::string shaderDir,
     std::vector<vk::DescriptorSetLayout> const &layouts,
     std::vector<vk::Format> const &outputFormats) {
   // contains information about what buffers 
@@ -109,7 +112,7 @@ void DeferredPass::initializePipeline(
 
   mRenderPass = createRenderPass(mContext->getDevice(), outputFormats);
 
-  mPipeline = createGraphicsPipeline(mContext->getDevice(), outputFormats.size(),
+  mPipeline = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
                                      mPipelineLayout.get(), mRenderPass.get());
 }
 

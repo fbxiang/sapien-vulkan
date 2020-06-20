@@ -7,7 +7,8 @@
 
 namespace svulkan {
 
-VulkanRenderer::VulkanRenderer(VulkanContext &context): mContext(&context) {
+VulkanRenderer::VulkanRenderer(VulkanContext &context, VulkanRendererConfig const &config):
+    mContext(&context), mConfig(config) {
   mGBufferPass = std::make_unique<GBufferPass>(context);
   mDeferredPass = std::make_unique<DeferredPass>(context);
 
@@ -162,6 +163,7 @@ void VulkanRenderer::initializeRenderPasses() {
   assert(mWidth > 0 && mHeight > 0);
 
   auto &l = mContext->getDescriptorSetLayouts();
+  std::string const shaderDir = mConfig.shaderDir == "" ? VulkanContext::gDefaultShaderDir : mConfig.shaderDir;
 
   // initialize gbuffer pass
   {
@@ -176,7 +178,7 @@ void VulkanRenderer::initializeRenderPasses() {
       mRenderTargetFormats.segmentationFormat
     };
 
-    mGBufferPass->initializePipeline(layouts, colorFormats, mRenderTargetFormats.depthFormat,
+    mGBufferPass->initializePipeline(shaderDir, layouts, colorFormats, mRenderTargetFormats.depthFormat,
                                      vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
     mGBufferPass->initializeFramebuffer(
         {mRenderTargets.albedo->mImageView.get(),
@@ -194,7 +196,7 @@ void VulkanRenderer::initializeRenderPasses() {
     std::vector<vk::DescriptorSetLayout> layouts = {
       l.scene.get(), l.camera.get(), l.deferred.get()
     };
-    mDeferredPass->initializePipeline(layouts, {mRenderTargetFormats.colorFormat});
+    mDeferredPass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat});
     mDeferredPass->initializeFramebuffer({mRenderTargets.lighting->mImageView.get()},
                                          {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
   }

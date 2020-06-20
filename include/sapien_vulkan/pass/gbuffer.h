@@ -22,7 +22,8 @@ class GBufferPass {
   GBufferPass(GBufferPass &&other) = default;
   GBufferPass &operator=(GBufferPass &&other) = default;
 
-  void initializePipeline(std::vector<vk::DescriptorSetLayout> const &layouts,
+  void initializePipeline(std::string const &shaderDir,
+                          std::vector<vk::DescriptorSetLayout> const &layouts,
                           std::vector<vk::Format> const &colorFormats,
                           vk::Format depthFormat,
                           vk::CullModeFlags cullMode,

@@ -1,5 +1,6 @@
 #pragma once
 #include "vulkan.h"
+#include "vulkan_renderer_config.h"
 
 namespace svulkan
 {
@@ -8,6 +9,7 @@ class VulkanContext;
 
 class VulkanRenderer {
   VulkanContext *mContext;
+  VulkanRendererConfig mConfig;
 
   int mWidth, mHeight;
 
@@ -34,7 +36,7 @@ class VulkanRenderer {
   vk::UniqueSampler mDeferredSampler;
 
  public:
-  VulkanRenderer(VulkanContext &context);
+  VulkanRenderer(VulkanContext &context, VulkanRendererConfig const &config);
 
   VulkanRenderer(VulkanRenderer const &other) = delete;
   VulkanRenderer &operator=(VulkanRenderer const &other) = delete;

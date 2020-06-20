@@ -585,8 +585,8 @@ std::unique_ptr<VulkanObject> VulkanContext::createVulkanObject() const {
       getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().object.get());
 }
 
-std::unique_ptr<VulkanRenderer> VulkanContext::createVulkanRenderer() {
-  return std::make_unique<VulkanRenderer>(*this);
+std::unique_ptr<VulkanRenderer> VulkanContext::createVulkanRenderer(VulkanRendererConfig const &config) {
+  return std::make_unique<VulkanRenderer>(*this, config);
 }
 
 std::unique_ptr<struct Camera> VulkanContext::createCamera() const {
@@ -611,5 +611,14 @@ std::unique_ptr<VulkanWindow> VulkanContext::createWindow() {
                                         vk::ColorSpaceKHR::eSrgbNonlinear);
 }
 #endif
+
+
+
+// static members
+
+std::string VulkanContext::gDefaultShaderDir{"spv"};
+void VulkanContext::setDefaultShaderDir(std::string const &dir) {
+  gDefaultShaderDir = dir;
+}
 
 }

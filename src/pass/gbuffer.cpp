@@ -35,14 +35,15 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device, std::vector<vk::
                                1, &subpassDescription));
 }
 
-static vk::UniquePipeline createGraphicsPipeline(vk::Device device, uint32_t numColorAttachments,
+static vk::UniquePipeline createGraphicsPipeline(std::string const &shaderDir,
+                                                 vk::Device device, uint32_t numColorAttachments,
                                                    vk::CullModeFlags cullMode, vk::FrontFace frontFace,
                                                    vk::PipelineLayout pipelineLayout, vk::RenderPass renderPass
                                                    ) {
   vk::UniquePipelineCache pipelineCache = device.createPipelineCacheUnique(vk::PipelineCacheCreateInfo());
 
-  auto vsm = createShaderModule(device, "spv/gbuffer.vert.spv");
-  auto fsm = createShaderModule(device, "spv/gbuffer.frag.spv");
+  auto vsm = createShaderModule(device, shaderDir + "/gbuffer.vert.spv");
+  auto fsm = createShaderModule(device, shaderDir + "/gbuffer.frag.spv");
 
   std::array<vk::PipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos {
     vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
@@ -125,6 +126,7 @@ static vk::UniquePipeline createGraphicsPipeline(vk::Device device, uint32_t num
 GBufferPass::GBufferPass(VulkanContext &context): mContext(&context) {}
 
 void GBufferPass::initializePipeline(
+    std::string const &shaderDir,
     std::vector<vk::DescriptorSetLayout> const &layouts,
     std::vector<vk::Format> const &colorFormats,
     vk::Format depthFormat,
@@ -136,7 +138,7 @@ void GBufferPass::initializePipeline(
 
   mRenderPass = createRenderPass(mContext->getDevice(), colorFormats, depthFormat,
                                  vk::AttachmentLoadOp::eClear);
-  mPipeline = createGraphicsPipeline(mContext->getDevice(), colorFormats.size(),
+  mPipeline = createGraphicsPipeline(shaderDir, mContext->getDevice(), colorFormats.size(),
                                      cullMode, frontFace, mPipelineLayout.get(), mRenderPass.get());
 
 }

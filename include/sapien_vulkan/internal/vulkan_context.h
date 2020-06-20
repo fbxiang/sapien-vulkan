@@ -4,6 +4,7 @@
 #include "sapien_vulkan/pass/deferred.h"
 #include <vulkan/vulkan.hpp>
 #include "sapien_vulkan/common/glm_common.h"
+#include "vulkan_renderer_config.h"
 
 #ifdef ON_SCREEN
 #include "sapien_vulkan/gui/gui.h"
@@ -96,7 +97,7 @@ class VulkanContext {
   std::shared_ptr<class VulkanMaterial> createMaterial();
   std::unique_ptr<class VulkanScene> createVulkanScene() const;
   std::unique_ptr<struct VulkanObject> createVulkanObject() const;
-  std::unique_ptr<VulkanRenderer> createVulkanRenderer();
+  std::unique_ptr<VulkanRenderer> createVulkanRenderer(VulkanRendererConfig const &config = {});
   std::unique_ptr<struct Camera> createCamera() const;
 
   std::shared_ptr<struct VulkanTextureData> loadTexture(std::string const &filename) const;
@@ -105,6 +106,10 @@ class VulkanContext {
 #ifdef ON_SCREEN
   std::unique_ptr<VulkanWindow> createWindow();
 #endif
+
+ public:
+  static std::string gDefaultShaderDir;
+  static void setDefaultShaderDir(std::string const &dir);
 };
 
 }
