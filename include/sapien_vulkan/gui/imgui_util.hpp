@@ -1,6 +1,6 @@
 #pragma once
+#ifdef ON_SCREEN
 #include "sapien_vulkan/internal/vulkan.h"
-
 
 namespace svulkan {
 
@@ -30,3 +30,4 @@ vk::UniqueFramebuffer createImguiFramebuffer(vk::Device device,
 }
 
 }
+#endif

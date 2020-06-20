@@ -1,7 +1,13 @@
 #pragma once
 
+#include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/deferred.h"
 #include <vulkan/vulkan.hpp>
 #include "sapien_vulkan/common/glm_common.h"
+
+#ifdef ON_SCREEN
+#include "sapien_vulkan/gui/gui.h"
+#endif
 
 namespace svulkan
 {
@@ -10,8 +16,8 @@ class Object;
 class VulkanRenderer;
 
 class VulkanContext {
+  bool mRequirePresent;
 
- private:
   vk::PhysicalDevice mPhysicalDevice;
   vk::UniqueInstance mInstance;
   vk::UniqueDevice mDevice;
@@ -23,7 +29,7 @@ class VulkanContext {
   std::shared_ptr<struct VulkanTextureData> mPlaceholderTexture {nullptr};
 
  public:
-  VulkanContext();
+  VulkanContext(bool requirePresent = true);
   ~VulkanContext();
 
   /** Get the graphics queue */
@@ -67,6 +73,10 @@ class VulkanContext {
     vk::UniqueDescriptorSetLayout deferred;
   } mDescriptorSetLayouts;
 
+ private:
+  std::shared_ptr<VulkanMesh> mCubeMesh{};
+  std::shared_ptr<VulkanMesh> mSphereMesh{};
+  std::shared_ptr<VulkanMesh> mYZPlaneMesh{};
   
  public:
   void initializeDescriptorSetLayouts();
@@ -91,6 +101,10 @@ class VulkanContext {
 
   std::shared_ptr<struct VulkanTextureData> loadTexture(std::string const &filename) const;
   std::shared_ptr<struct VulkanTextureData> getPlaceholderTexture();
+
+#ifdef ON_SCREEN
+  std::unique_ptr<VulkanWindow> createWindow();
+#endif
 };
 
 }

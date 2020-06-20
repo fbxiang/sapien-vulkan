@@ -66,11 +66,13 @@ void LoadSponza(VulkanContext &context, Scene &scene) {
 
 void LoadCustom(VulkanContext &context, Scene &scene) {
   // scene.addObject(context.loadCube({0.1, 0.1, 0.1}));
-  // scene.addObject(context.loadSphere(0.1));
-  // scene.addObject(context.loadYZPlane({1, 1}));
-  auto obj = context.loadCapsule(0.1, 0.1);
-  obj->mTransform.position = {0, 1, 0};
+  auto obj = context.loadSphere();
+  obj->mTransform.scale = {0.1, 0.1, 0.1};
+  obj->mTransform.position = {0, 0.3, 0};
   scene.addObject(std::move(obj));
+  // scene.addObject(context.loadYZPlane({1, 1}));
+  // auto obj = context.loadCapsule(0.1, 0.1);
+  // scene.addObject(std::move(obj));
 }
 
 int main() {
@@ -88,18 +90,11 @@ int main() {
 
   renderer->resize(800, 600);
 
-  std::vector<vk::Format> requestSurfaceImageFormat = {vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm,
-    vk::Format::eB8G8R8Unorm, vk::Format::eR8G8B8Unorm};
-  const vk::ColorSpaceKHR requestSurfaceColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+  auto vwindow = context.createWindow();
 
-  VulkanWindow vwindow {
-    context.getInstance(), context.getDevice(), context.getPhysicalDevice(),
-    context.getGraphicsQueueFamilyIndex(), requestSurfaceImageFormat, requestSurfaceColorSpace};
+  vwindow->initImgui(context.getDescriptorPool(), context.getCommandPool());
 
-  vwindow.initImgui(context.getDescriptorPool(), context.getCommandPool());
-
-  vwindow.recreateSwapchain(800, 600);
-  vwindow.recreateImguiResources(context.getGraphicsQueueFamilyIndex());
+  vwindow->updateSize(800, 600);
   camera->aspect = 4.f/3.f;
   device.waitIdle();
 
@@ -111,29 +106,32 @@ int main() {
                                                                    context.getCommandPool(),
                                                                    vk::CommandBufferLevel::ePrimary);
 
-  glfwSetWindowSizeCallback(vwindow.getWindow(), glfw_resize_callback);
+  glfwSetWindowSizeCallback(vwindow->getWindow(), glfw_resize_callback);
 
-  while (!vwindow.isClosed()) {
+  while (!vwindow->isClosed()) {
 
     if (gSwapchainRebuild) {
       gSwapchainRebuild = false;
       device.waitIdle();
-      vwindow.recreateSwapchain(gSwapchainResizeWidth, gSwapchainResizeHeight);
-      vwindow.recreateImguiResources(context.getGraphicsQueueFamilyIndex());
-      renderer->resize(vwindow.getWidth(), vwindow.getHeight());
+      vwindow->updateSize(gSwapchainResizeWidth, gSwapchainResizeHeight);
+      renderer->resize(vwindow->getWidth(), vwindow->getHeight());
       device.waitIdle();
-      camera->aspect = static_cast<float>(vwindow.getWidth()) / vwindow.getHeight();
+      camera->aspect = static_cast<float>(vwindow->getWidth()) / vwindow->getHeight();
       continue;
     }
 
     // get the next image
     try {
-      vwindow.newFrame();
+      vwindow->newFrame();
     } catch (vk::OutOfDateKHRError &e) {
       gSwapchainRebuild = true;
       device.waitIdle();
       continue;
     }
+
+    ImGui::NewFrame();
+    ImGui::ShowDemoWindow();
+    ImGui::Render();
 
     // wait for previous frame to finish
     {
@@ -145,23 +143,23 @@ int main() {
     {
       sceneCommandBuffer->begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
       renderer->render(sceneCommandBuffer.get(), scene, *camera);
-      renderer->display(sceneCommandBuffer.get(), vwindow.getBackBuffer(),
-                        vwindow.getBackBufferFormat(), vwindow.getWidth(), vwindow.getHeight());
+      renderer->display(sceneCommandBuffer.get(), vwindow->getBackBuffer(),
+                        vwindow->getBackBufferFormat(), vwindow->getWidth(), vwindow->getHeight());
       sceneCommandBuffer->end();
 
-      auto imageAcquiredSemaphore = vwindow.getImageAcquiredSemaphore();
+      auto imageAcquiredSemaphore = vwindow->getImageAcquiredSemaphore();
       vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
       vk::SubmitInfo info(1, &imageAcquiredSemaphore, &waitStage, 1, &sceneCommandBuffer.get(),
                           1, &sceneRenderSemaphore.get());
       context.getGraphicsQueue().submit(info, {});
     }
 
-    auto swapchain = vwindow.getSwapchain();
-    auto fidx = vwindow.getFrameIndex();
+    auto swapchain = vwindow->getSwapchain();
+    auto fidx = vwindow->getFrameIndex();
 
     vk::PresentInfoKHR info(1, &sceneRenderSemaphore.get(), 1, &swapchain, &fidx);
     try {
-      vwindow.presentFrameWithImgui(context.getGraphicsQueue(), vwindow.getPresentQueue(),
+      vwindow->presentFrameWithImgui(context.getGraphicsQueue(), vwindow->getPresentQueue(),
                                     sceneRenderSemaphore.get(), sceneRenderFence.get());
     } catch (vk::OutOfDateKHRError &e) {
       gSwapchainRebuild = true;
@@ -202,27 +200,27 @@ int main() {
     // }
 
 
-    if (vwindow.isKeyDown('q')) {
-      vwindow.close();
+    if (vwindow->isKeyDown('q')) {
+      vwindow->close();
     }
 
-    if (vwindow.isMouseKeyDown(1)) {
-      auto [x, y] = vwindow.getMouseDelta();
+    if (vwindow->isMouseKeyDown(1)) {
+      auto [x, y] = vwindow->getMouseDelta();
       float r = 1e-3;
       cameraController.rotate(0, -r * y, -r * x);
     }
 
     constexpr float r = 1e-3;
-    if (vwindow.isKeyDown('w')) {
+    if (vwindow->isKeyDown('w')) {
       cameraController.move(r, 0, 0);
     }
-    if (vwindow.isKeyDown('s')) {
+    if (vwindow->isKeyDown('s')) {
       cameraController.move(-r, 0, 0);
     }
-    if (vwindow.isKeyDown('a')) {
+    if (vwindow->isKeyDown('a')) {
       cameraController.move(0, r, 0);
     }
-    if (vwindow.isKeyDown('d')) {
+    if (vwindow->isKeyDown('d')) {
       cameraController.move(0, -r, 0);
     }
   }

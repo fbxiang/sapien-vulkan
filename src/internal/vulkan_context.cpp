@@ -9,25 +9,19 @@
 #include "sapien_vulkan/internal/vulkan_scene.h"
 #include <iostream>
 #include "sapien_vulkan/internal/vulkan_renderer.h"
-#include "sapien_vulkan/pass/gbuffer.h"
-#include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/camera.h"
 #include "sapien_vulkan/internal/vulkan_texture.h"
 #include "sapien_vulkan/data/geometry.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
 #include "sapien_vulkan/common/stb_image.h"
-
-#ifdef ON_SCREEN
-#define GLFW_INCLUDE_VULKAN
-#include "GLFW/glfw3.h"
-#endif
 
 
 namespace svulkan
 {
 
-VulkanContext::VulkanContext() {
+VulkanContext::VulkanContext(bool requirePresent) : mRequirePresent(requirePresent) {
   createInstance();
   pickPhysicalDevice();
   createLogicalDevice();
@@ -67,7 +61,9 @@ bool VulkanContext::checkValidationLayerSupport() {
 void VulkanContext::createInstance() {
 
 #ifdef ON_SCREEN
-  glfwInit();
+  if (mRequirePresent) {
+    glfwInit();
+  }
 #endif
 
 #ifdef VK_VALIDATION
@@ -85,10 +81,12 @@ void VulkanContext::createInstance() {
   std::vector<const char *> instanceExtensions;
 
 #ifdef ON_SCREEN
-  uint32_t glfwExtensionCount = 0;
-  const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-  for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
-    instanceExtensions.push_back(glfwExtensions[i]);
+  if (mRequirePresent) {
+    uint32_t glfwExtensionCount = 0;
+    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
+      instanceExtensions.push_back(glfwExtensions[i]);
+    }
   }
 #endif
 
@@ -112,10 +110,12 @@ void VulkanContext::createLogicalDevice() {
   float queuePriority = 0.0f;
   vk::DeviceQueueCreateInfo deviceQueueCreateInfo(
       vk::DeviceQueueCreateFlags(), static_cast<uint32_t>(graphicsQueueFamilyIndex), 1, &queuePriority);
+  std::vector<const char *> deviceExtensions {};
+
 #ifdef ON_SCREEN
-  std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-#else
-  std::vector<const char *> deviceExtensions = {};
+  if (mRequirePresent) {
+    deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  }
 #endif
   mDevice = mPhysicalDevice.createDeviceUnique(
       vk::DeviceCreateInfo(vk::DeviceCreateFlags(), 1, &deviceQueueCreateInfo, 0, nullptr,
@@ -221,14 +221,16 @@ static float shininessToRoughness(float ns) {
 std::unique_ptr<Object> VulkanContext::loadCube() {
   std::vector vertices = FlatCubeVertices;
   std::vector indices = FlatCubeIndices;
-  static std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
-      getPhysicalDevice(), getDevice(), mCommandPool.get(),
-      getGraphicsQueue(), vertices, indices, false);
+  if (!mCubeMesh) {
+    mCubeMesh = std::make_shared<VulkanMesh>(
+        getPhysicalDevice(), getDevice(), mCommandPool.get(),
+        getGraphicsQueue(), vertices, indices, false);
+  }
 
   std::unique_ptr<VulkanObject> vobj =
       std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
                                      mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
-  vobj->setMesh(vulkanMesh);
+  vobj->setMesh(mCubeMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
 
@@ -237,8 +239,7 @@ std::unique_ptr<Object> VulkanContext::loadCube() {
 }
 
 std::unique_ptr<Object> VulkanContext::loadSphere() {
-  static std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
-  if (!vulkanMesh) {
+  if (!mSphereMesh) {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     uint32_t stacks = 20;
@@ -273,14 +274,14 @@ std::unique_ptr<Object> VulkanContext::loadSphere() {
       }
     }
 
-    vulkanMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+    mSphereMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
                                               getGraphicsQueue(), vertices, indices, false);
   }
 
   std::unique_ptr<VulkanObject> vobj =
       std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
                                      mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
-  vobj->setMesh(vulkanMesh);
+  vobj->setMesh(mSphereMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
 
@@ -386,9 +387,7 @@ std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLengt
 }
 
 std::unique_ptr<Object> VulkanContext::loadYZPlane() {
-  static std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
-
-  if (!vulkanMesh)
+  if (!mYZPlaneMesh)
   {
     std::vector<Vertex> vertices = {{{0, -1, -1}, {1, 0, 0}, {0, 0}, {0, 1, 0}, {0, 0, 1}},
                                     {{0, 1, -1}, {1, 0, 0}, {1, 0}, {0, 1, 0}, {0, 0, 1}},
@@ -396,14 +395,14 @@ std::unique_ptr<Object> VulkanContext::loadYZPlane() {
                                     {{0, 1, 1}, {1, 0, 0}, {1, 1}, {0, 1, 0}, {0, 0, 1}}};
     std::vector<uint32_t> indices = { 0, 1, 3, 0, 3, 2 };
 
-  vulkanMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+  mYZPlaneMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
                                             getGraphicsQueue(), vertices, indices, false);
   }
 
   std::unique_ptr<VulkanObject> vobj =
       std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
                                      mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
-  vobj->setMesh(vulkanMesh);
+  vobj->setMesh(mYZPlaneMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
 
@@ -597,8 +596,20 @@ std::unique_ptr<struct Camera> VulkanContext::createCamera() const {
 
 VulkanContext::~VulkanContext() {
 #ifdef ON_SCREEN
-  glfwTerminate();
+  if (mRequirePresent) {
+    glfwTerminate();
+  }
 #endif
 }
+
+#ifdef ON_SCREEN
+std::unique_ptr<VulkanWindow> VulkanContext::createWindow() {
+  return std::make_unique<VulkanWindow>(getInstance(), getDevice(), getPhysicalDevice(),
+                                        getGraphicsQueueFamilyIndex(),
+                                        std::vector{vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm,
+                                          vk::Format::eB8G8R8Unorm, vk::Format::eR8G8B8Unorm},
+                                        vk::ColorSpaceKHR::eSrgbNonlinear);
+}
+#endif
 
 }

@@ -48,16 +48,17 @@ vec4 getCameraSpacePosition(vec2 texcoord) {
 }
 
 vec3 getBackgroundColor(vec3 texcoord) {
-  float r = sqrt(texcoord.x * texcoord.x + texcoord.z * texcoord.z);
-  float angle = atan(texcoord.y / r) * 57.3;
+  return vec3(0,0,0);
+  // float r = sqrt(texcoord.x * texcoord.x + texcoord.z * texcoord.z);
+  // float angle = atan(texcoord.y / r) * 57.3;
 
-  vec3 horizonColor = vec3(0.9, 0.9, 0.9);
-  vec3 zenithColor = vec3(0.522, 0.757, 0.914);
-  vec3 groundColor = vec3(0.5, 0.410, 0.271);
+  // vec3 horizonColor = vec3(0.9, 0.9, 0.9);
+  // vec3 zenithColor = vec3(0.522, 0.757, 0.914);
+  // vec3 groundColor = vec3(0.5, 0.410, 0.271);
   
-  return mix(mix(zenithColor, horizonColor, smoothstep(15.f, 5.f, angle)),
-             groundColor,
-             smoothstep(-5.f, -15.f, angle));
+  // return mix(mix(zenithColor, horizonColor, smoothstep(15.f, 5.f, angle)),
+  //            groundColor,
+  //            smoothstep(-5.f, -15.f, angle));
 }
 
 float diffuse(vec3 l, vec3 v, vec3 n) {
@@ -146,11 +147,10 @@ void main() {
   if (depth == 1) {
     outColor = vec4(getBackgroundColor((cameraUBO.viewMatrixInverse * csPosition).xyz), 1.f);
   } else {
-    // outColor = vec4(color, 1);
-    // outColor = vec4(albedo, 1);
+    outColor = vec4(color, 1);
   }
 
-  outColor = vec4(abs(normal), 1);
+  // outColor = vec4(abs(normal), 1);
   // outColor = vec4(depth, depth, depth, 1);
   // outColor = vec4(csPosition.xy, 0, 1);
   // outColor = vec4(wsPosition.xyz, 1);

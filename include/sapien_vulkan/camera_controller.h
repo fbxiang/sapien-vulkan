@@ -13,6 +13,8 @@ class FPSCameraController {
   glm::vec3 mUp;
   glm::vec3 mLeft;
 
+  glm::quat mInitialRotation;
+
   void update();
  public:
   FPSCameraController(Camera &camera, glm::vec3 forward, glm::vec3 up);

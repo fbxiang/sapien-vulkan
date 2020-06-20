@@ -8,7 +8,9 @@ FPSCameraController::FPSCameraController(Camera &camera, glm::vec3 forward, glm:
     : mCamera(&camera),
       mForward(glm::normalize(forward)),
       mUp(glm::normalize(up)),
-      mLeft(glm::cross(mUp, mForward)) {}
+      mLeft(glm::cross(mUp, mForward)) {
+  mInitialRotation = glm::mat3(-mLeft, mUp, -mForward);
+}
 
 void FPSCameraController::setRPY(float roll, float pitch, float yaw) {
   mRPY = {roll, pitch, yaw};
@@ -39,8 +41,8 @@ void FPSCameraController::update() {
     mRPY.z += 2 * glm::pi<float>();
   }
 
-  mCamera->rotation =
-      glm::angleAxis(mRPY.z, mUp) * glm::angleAxis(-mRPY.y, mLeft) * glm::angleAxis(mRPY.x, mForward);
+  mCamera->rotation = glm::angleAxis(mRPY.z, mUp) * glm::angleAxis(-mRPY.y, mLeft) *
+                      glm::angleAxis(mRPY.x, mForward) * mInitialRotation;
   mCamera->position = mXYZ;
 }
 

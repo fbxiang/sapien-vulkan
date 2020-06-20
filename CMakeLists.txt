@@ -20,8 +20,7 @@ find_package(assimp REQUIRED)
 find_package(Vulkan REQUIRED)
 file(GLOB_RECURSE RENDER_SRC "src/*.cpp")
 
-set(ON_SCREEN TRUE CACHE BOOL "Build with on screen rendering support")
-
+set(ON_SCREEN TRUE CACHE BOOL "Vulkan renderer with on screen rendering") 
 include_directories("include")
 
 if (${ON_SCREEN}) 

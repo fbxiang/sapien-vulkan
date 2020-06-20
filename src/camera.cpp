@@ -33,7 +33,12 @@ glm::mat4 Camera::getModelMat() const {
 glm::mat4 Camera::getViewMat() const { return glm::inverse(getModelMat()); }
 
 glm::mat4 Camera::getProjectionMat() const {
-  glm::mat4 proj = glm::perspective(fovy, aspect, near, far);
+  glm::mat4 proj;
+  if (ortho) {
+    proj = glm::ortho(-scaling * aspect, scaling * aspect, -scaling, scaling, near, far);
+  } else {
+    proj = glm::perspective(fovy, aspect, near, far);
+  }
   proj[1][1] *= -1;
   return proj;
 }

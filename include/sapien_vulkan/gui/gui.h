@@ -1,4 +1,5 @@
 #pragma once
+#ifdef ON_SCREEN
 #define GLFW_INCLUDE_VULKAN
 
 #include <iostream>
@@ -109,11 +110,8 @@ class VulkanWindow {
 
   ~VulkanWindow();
 
-  /** Called when the window is resized to recreate the sawpchain */
-  void recreateSwapchain(uint32_t w, uint32_t h); 
-
-  /** Called after swapchain recreation to update ImGui related resources */
-  void recreateImguiResources(uint32_t queueFamily); 
+  /** recreate the swapchain and ImGui resources with a new size */
+  void updateSize(uint32_t w, uint32_t h);
 
   inline GLFWwindow* getWindow() const {return mWindow;}
 
@@ -131,7 +129,14 @@ class VulkanWindow {
   void selectPresentMode(std::vector<vk::PresentModeKHR> const &requestModes); 
 
   void createGlfwWindow(vk::Instance instance, uint32_t graphicsQueueFamilyIndex);
+
+  /** Called when the window is resized to recreate the sawpchain */
+  void recreateSwapchain(uint32_t w, uint32_t h); 
+
+  /** Called after swapchain recreation to update ImGui related resources */
+  void recreateImguiResources(); 
 };
 
 }
 
+#endif

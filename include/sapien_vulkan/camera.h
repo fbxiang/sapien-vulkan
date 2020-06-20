@@ -13,6 +13,9 @@ struct Camera {
   float fovy = glm::radians(45.f);
   float aspect = 1.f;
 
+  float scaling = 1.f;
+  bool ortho = false;
+
   vk::Device mDevice;
   VulkanBufferData mUBO;
   vk::UniqueDescriptorSet mDescriptorSet;
@@ -25,10 +28,6 @@ struct Camera {
   glm::mat4 getModelMat() const;
   glm::mat4 getViewMat() const;
   glm::mat4 getProjectionMat() const;
-};
-
-struct FPSCamera : public Camera{
-
 };
 
 }

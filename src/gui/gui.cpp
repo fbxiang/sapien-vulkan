@@ -41,9 +41,6 @@ void VulkanWindow::newFrame() {
 
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
-  ImGui::NewFrame();
-  ImGui::ShowDemoWindow();
-  ImGui::Render();
 }
 
 bool VulkanWindow::isKeyDown(char key) {
@@ -174,6 +171,12 @@ void VulkanWindow::selectPresentMode(std::vector<vk::PresentModeKHR> const &requ
   mPresentMode = vk::PresentModeKHR::eFifo; // always available
 }
 
+void VulkanWindow::updateSize(uint32_t w, uint32_t h) {
+  recreateSwapchain(w, h);
+  recreateImguiResources();
+  mDevice.waitIdle();
+}
+
 void VulkanWindow::recreateSwapchain(uint32_t w, uint32_t h) {
   if (mMinImageCount == 0) {
     throw std::runtime_error("Invalid min image count specified");
@@ -220,18 +223,16 @@ void VulkanWindow::recreateSwapchain(uint32_t w, uint32_t h) {
   }
 }
 
-void VulkanWindow::recreateImguiResources(uint32_t queueFamily) {
+void VulkanWindow::recreateImguiResources() {
   for (uint32_t i = 0; i < mFrames.size(); ++i) {
     mFrames[i].mImguiCommandBuffer.reset();
     mFrames[i].mImguiCommandPool.reset();
   }
-  mDevice.createCommandPoolUnique({vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamily});
   for (uint32_t i = 0; i < mFrames.size(); ++i) {
     mFrames[i].mImguiCommandPool = mDevice.createCommandPoolUnique(
-        vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamily));
+        {vk::CommandPoolCreateFlagBits::eResetCommandBuffer, mGraphicsQueueFamilyIndex});
     mFrames[i].mImguiCommandBuffer = std::move(mDevice.allocateCommandBuffersUnique(
         {mFrames[i].mImguiCommandPool.get(), vk::CommandBufferLevel::ePrimary, 1}).front());
-
 
     vk::FramebufferCreateInfo info ({}, mImguiRenderPass.get(), 1, &mFrames[i].mBackbufferView.get(),
                                     mWidth, mHeight, 1);
@@ -264,10 +265,10 @@ void VulkanWindow::close() {
   mClosed = true;
   glfwSetWindowShouldClose(mWindow, true);
 
+  mDevice.waitIdle();
+
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
-
-  mDevice.waitIdle();
 
   mImguiRenderPass.reset();
   mFrameSemaphores.clear();
