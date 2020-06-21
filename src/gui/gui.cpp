@@ -248,9 +248,21 @@ void VulkanWindow::createGlfwWindow(vk::Instance instance, uint32_t graphicsQueu
   mWindow = glfwCreateWindow(800, 600, "vulkan", nullptr, nullptr);
 
   VkSurfaceKHR tmpSurface;
-  
-  if (glfwCreateWindowSurface(instance, mWindow, nullptr, &tmpSurface) != VK_SUCCESS) {
-    throw std::runtime_error("create window failed: cannot create GLFW window surface");
+
+  auto result = glfwCreateWindowSurface(instance, mWindow, nullptr, &tmpSurface);
+  if (result != VK_SUCCESS) {
+    switch (result) {
+      case GLFW_NOT_INITIALIZED:
+        throw std::runtime_error("create window failed: GLFW not initialized");
+      case GLFW_API_UNAVAILABLE:
+        throw std::runtime_error("create window failed: GLFW API unavailable");
+      case GLFW_PLATFORM_ERROR:
+        throw std::runtime_error("create window failed: GLFW platform error");
+      case GLFW_INVALID_VALUE:
+        throw std::runtime_error("create window failed: GLFW invalid value");
+      default:
+        throw std::runtime_error("create window failed: glfwCreateWindowSurface failed with unknown error");
+    }
   }
   mSurface = vk::UniqueSurfaceKHR(tmpSurface, instance);
 

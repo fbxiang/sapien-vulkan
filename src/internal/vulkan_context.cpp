@@ -21,6 +21,11 @@
 namespace svulkan
 {
 
+static void glfwErrorCallback(int error_code, const char* description) {
+  log::error("GLFW error: {}", description);
+}
+
+
 VulkanContext::VulkanContext(bool requirePresent) : mRequirePresent(requirePresent) {
   createInstance();
   pickPhysicalDevice();
@@ -62,7 +67,9 @@ void VulkanContext::createInstance() {
 
 #ifdef ON_SCREEN
   if (mRequirePresent) {
+    log::info("Initializing GLFW");
     glfwInit();
+    glfwSetErrorCallback(glfwErrorCallback);
   }
 #endif
 
@@ -78,12 +85,33 @@ void VulkanContext::createInstance() {
   vk::ApplicationInfo appInfo("Vulkan Renderer", VK_MAKE_VERSION(0, 0, 1), "No Engine",
                               VK_MAKE_VERSION(0, 0, 1), VK_API_VERSION_1_1);
 
+
+  auto extensionProperties = vk::enumerateInstanceExtensionProperties(nullptr);
+  std::string allExtensions;
+  for (auto &p : extensionProperties) {
+    allExtensions += std::string(p.extensionName) + " ";
+  }
+  spdlog::info("All available extensions: {}", allExtensions);
+
   std::vector<const char *> instanceExtensions;
 
 #ifdef ON_SCREEN
   if (mRequirePresent) {
+    if (!glfwVulkanSupported()) {
+      throw std::runtime_error("Failed to create instance: GLFW does not support Vulkan");
+    }
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    if (!glfwExtensions) {
+      throw std::runtime_error("Failed to create instance: cannot get required GLFW extensions");
+    }
+
+    std::string extensionNames = "";
+    for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
+      extensionNames += std::string(glfwExtensions[i]) + " ";
+    }
+    log::info("GLFW requested extensions: {}", extensionNames);
+
     for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
       instanceExtensions.push_back(glfwExtensions[i]);
     }
