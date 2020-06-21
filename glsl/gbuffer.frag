@@ -38,6 +38,10 @@ void main() {
     outAlbedo = material.baseColor;
   }
 
+  if (outAlbedo.a == 0) {
+    discard;
+  }
+
   if (material.hasSpecularTexture != 0) {
     outSpecular.r = texture(specularTexture, inUV).r;
   } else {

@@ -3,4 +3,5 @@
 
 struct VulkanRendererConfig {
   std::string shaderDir {};
+  std::string culling {"back"};
 };

@@ -165,6 +165,20 @@ void VulkanRenderer::initializeRenderPasses() {
   auto &l = mContext->getDescriptorSetLayouts();
   std::string const shaderDir = mConfig.shaderDir == "" ? VulkanContext::gDefaultShaderDir : mConfig.shaderDir;
 
+  vk::CullModeFlags cullMode;
+  if (mConfig.culling == "back") {
+    cullMode = vk::CullModeFlagBits::eBack;
+  } else if (mConfig.culling == "front") {
+    cullMode = vk::CullModeFlagBits::eFront;
+  } else if (mConfig.culling == "both") {
+    cullMode = vk::CullModeFlagBits::eFrontAndBack;
+  } else if (mConfig.culling == "none" || mConfig.culling == "") {
+    cullMode = vk::CullModeFlagBits::eNone;
+  } else {
+    log::warn("Unknown culling mode {}, default to None");
+    cullMode = vk::CullModeFlagBits::eNone;
+  }
+
   // initialize gbuffer pass
   {
     std::vector<vk::DescriptorSetLayout> layouts = {
@@ -179,7 +193,7 @@ void VulkanRenderer::initializeRenderPasses() {
     };
 
     mGBufferPass->initializePipeline(shaderDir, layouts, colorFormats, mRenderTargetFormats.depthFormat,
-                                     vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
+                                     cullMode, vk::FrontFace::eCounterClockwise);
     mGBufferPass->initializeFramebuffer(
         {mRenderTargets.albedo->mImageView.get(),
          mRenderTargets.position->mImageView.get(),

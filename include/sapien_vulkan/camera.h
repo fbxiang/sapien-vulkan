@@ -8,7 +8,7 @@ namespace svulkan
 struct Camera {
   glm::vec3 position = {};
   glm::quat rotation = {};
-  float near = 0.1f;
+  float near = 0.01f;
   float far = 1000.f;
   float fovy = glm::radians(45.f);
   float aspect = 1.f;
