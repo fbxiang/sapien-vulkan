@@ -45,6 +45,12 @@ struct VulkanImageData {
       sourceAccessFlag2 = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead;
       sourceStage = vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests;
       aspect = vk::ImageAspectFlagBits::eDepth;
+    } else if (mFormat == vk::Format::eR32G32B32A32Uint){
+      sourceLayout = vk::ImageLayout::eColorAttachmentOptimal;
+      sourceAccessFlag1 = vk::AccessFlagBits::eColorAttachmentWrite;
+      sourceAccessFlag2 = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eColorAttachmentRead;
+      sourceStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+      aspect = vk::ImageAspectFlagBits::eColor;
     } else {
       throw std::runtime_error("This image format does not support download");
     }

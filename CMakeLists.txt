@@ -31,7 +31,6 @@ if (${ON_SCREEN})
     file(GLOB GUI_SRC "3rd_party/imgui/*.cpp"
         "3rd_party/imgui/examples/imgui_impl_glfw.cpp"
         "3rd_party/imgui/examples/imgui_impl_vulkan.cpp" )
-    set(GLFW_LIBRARIES glfw)
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/spv)
@@ -45,8 +44,8 @@ else()
     add_custom_target(glsl COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/spv/* ${CMAKE_BINARY_DIR}/spv)
 endif()
 
-add_library(sapien-vulkan ${RENDER_SRC} ${GUI_SRC})
-target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} ${GLFW_LIBRARIES} Vulkan::Vulkan spdlog stdc++fs)
+add_library(sapien-vulkan STATIC ${RENDER_SRC} ${GUI_SRC})
+target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} glfw3 dl pthread Vulkan::Vulkan spdlog stdc++fs)
 add_dependencies(sapien-vulkan glsl)
 
 add_executable(main app/main.cpp)

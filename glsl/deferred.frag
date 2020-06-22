@@ -32,20 +32,20 @@ layout(set = 2, binding = 4) uniform sampler2D depthSampler;
 layout(location = 0) in vec2 inUV;
 layout(location = 0) out vec4 outColor;
 
-vec4 tex2camera(vec4 pos) {
-  vec4 ndc = vec4(pos.xy * 2.f - 1.f, pos.z, 1.f);
-  vec4 cam = cameraUBO.projectionMatrixInverse * ndc;
-  return cam / cam.w;
-}
+// vec4 tex2camera(vec4 pos) {
+//   vec4 ndc = vec4(pos.xy * 2.f - 1.f, pos.z, 1.f);
+//   vec4 cam = cameraUBO.projectionMatrixInverse * ndc;
+//   return cam / cam.w;
+// }
 
 vec4 world2camera(vec4 pos) {
   return cameraUBO.viewMatrix * pos;
 }
 
-vec4 getCameraSpacePosition(vec2 texcoord) {
-  float depth = texture(depthSampler, texcoord).x;
-  return tex2camera(vec4(texcoord, depth, 1.f));
-}
+// vec4 getCameraSpacePosition(vec2 texcoord) {
+//   float depth = texture(depthSampler, texcoord).x;
+//   return tex2camera(vec4(texcoord, depth, 1.f));
+// }
 
 vec3 getBackgroundColor(vec3 texcoord) {
   return vec3(0,0,0);
@@ -98,9 +98,9 @@ void main() {
   float roughness = srm.y;
   float metallic = srm.z;
 
-  vec3 normal = texture(normalSampler, inUV).xyz * 2 - 1;
-  // vec4 csPosition = texture(positionSampler, inUV)
-  vec4 csPosition = getCameraSpacePosition(inUV);
+  vec3 normal = texture(normalSampler, inUV).xyz;
+  vec4 csPosition = texture(positionSampler, inUV);
+  // vec4 csPosition = getCameraSpacePosition(inUV);
   vec3 camDir = -normalize(csPosition.xyz);
 
   vec3 color = vec3(0.f);

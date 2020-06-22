@@ -51,8 +51,8 @@ void main() {
   outSpecular.b = material.metallic;
 
   if (material.hasNormalTexture != 0) {
-    outNormal = vec4(normalize(inTbn * texture(normalTexture, inUV).xyz), 0) * 0.5 + 0.5;
+    outNormal = vec4(normalize(inTbn * texture(normalTexture, inUV).xyz), 0);
   } else {
-    outNormal = vec4(normalize(inTbn * vec3(0, 0, 1)), 0) * 0.5 + 0.5;
+    outNormal = vec4(normalize(inTbn * vec3(0, 0, 1)), 0);
   }
 }

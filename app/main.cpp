@@ -84,6 +84,7 @@ int main() {
   LoadSponza(context, scene);
 
   auto camera = context.createCamera();
+
   FPSCameraController cameraController(*camera, {0,0,-1}, {0,1,0});
   cameraController.setXYZ(0, 0.3, 0);
   cameraController.setRPY(0, 0, 1.5);
