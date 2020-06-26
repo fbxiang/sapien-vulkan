@@ -60,6 +60,10 @@ class VulkanRenderer {
   std::vector<uint32_t> downloadSegmentation();
   std::vector<float> downloadDepth();
   std::vector<float> downloadLighting();
+
+  inline RenderTargets &getRenderTargets() {
+    return mRenderTargets;
+  }
 };
 
 }

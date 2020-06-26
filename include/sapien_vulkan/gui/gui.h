@@ -82,6 +82,8 @@ class VulkanWindow {
   
   ImVec2 getMouseDelta(); 
 
+  ImVec2 getMousePosition();
+
   bool isMouseKeyDown(int key); 
 
   bool presentFrameWithImgui(vk::Queue graphicsQueue, vk::Queue presentQueue,

@@ -53,6 +53,10 @@ ImVec2 VulkanWindow::getMouseDelta() {
   return mMouseDelta;
 }
 
+ImVec2 VulkanWindow::getMousePosition() {
+  return mMousePos;
+}
+
 bool VulkanWindow::isMouseKeyDown(int key) {
   return ImGui::IsMouseDown(key);
 }
