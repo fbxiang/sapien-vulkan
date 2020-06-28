@@ -7,9 +7,10 @@ namespace svulkan
 VulkanWindow::VulkanWindow(vk::Instance instance, vk::Device device, vk::PhysicalDevice physicalDevice,
                            uint32_t graphicsQueueFamilyIndex,
                            std::vector<vk::Format> const &requestFormats, vk::ColorSpaceKHR requestColorSpace,
+                           uint32_t width, uint32_t height,
                            std::vector<vk::PresentModeKHR> const& requestModes, uint32_t minImageCount)
     : mInstance(instance), mDevice(device), mPhysicalDevice(physicalDevice), mMinImageCount(minImageCount) {
-  createGlfwWindow(instance, graphicsQueueFamilyIndex);
+  createGlfwWindow(instance, graphicsQueueFamilyIndex, width, height);
   selectSurfaceFormat(requestFormats, requestColorSpace);
   selectPresentMode(requestModes);
 }
@@ -247,9 +248,10 @@ void VulkanWindow::recreateImguiResources() {
   }
 }
 
-void VulkanWindow::createGlfwWindow(vk::Instance instance, uint32_t graphicsQueueFamilyIndex) {
+void VulkanWindow::createGlfwWindow(vk::Instance instance, uint32_t graphicsQueueFamilyIndex,
+                                    uint32_t width, uint32_t height) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  mWindow = glfwCreateWindow(800, 600, "vulkan", nullptr, nullptr);
+  mWindow = glfwCreateWindow(width, height, "vulkan", nullptr, nullptr);
 
   VkSurfaceKHR tmpSurface;
 

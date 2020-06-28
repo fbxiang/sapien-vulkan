@@ -631,12 +631,12 @@ VulkanContext::~VulkanContext() {
 }
 
 #ifdef ON_SCREEN
-std::unique_ptr<VulkanWindow> VulkanContext::createWindow() {
+std::unique_ptr<VulkanWindow> VulkanContext::createWindow(uint32_t width, uint32_t height) {
   return std::make_unique<VulkanWindow>(getInstance(), getDevice(), getPhysicalDevice(),
                                         getGraphicsQueueFamilyIndex(),
                                         std::vector{vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm,
                                           vk::Format::eB8G8R8Unorm, vk::Format::eR8G8B8Unorm},
-                                        vk::ColorSpaceKHR::eSrgbNonlinear);
+                                        vk::ColorSpaceKHR::eSrgbNonlinear, width, height);
 }
 #endif
 

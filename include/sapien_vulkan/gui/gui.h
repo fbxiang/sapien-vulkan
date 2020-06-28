@@ -100,7 +100,7 @@ class VulkanWindow {
   VulkanWindow(vk::Instance instance, vk::Device device, vk::PhysicalDevice physicalDevice,
                uint32_t graphicsQueueFamilyIndex,
                std::vector<vk::Format> const &requestFormats,
-               vk::ColorSpaceKHR requestColorSpace,
+               vk::ColorSpaceKHR requestColorSpace, uint32_t width = 800, uint32_t height = 600,
                std::vector<vk::PresentModeKHR> const& requestModes={vk::PresentModeKHR::eFifo},
                uint32_t minImageCount=3);
 
@@ -130,7 +130,8 @@ class VulkanWindow {
   /** Called at initialization time  */
   void selectPresentMode(std::vector<vk::PresentModeKHR> const &requestModes); 
 
-  void createGlfwWindow(vk::Instance instance, uint32_t graphicsQueueFamilyIndex);
+  void createGlfwWindow(vk::Instance instance, uint32_t graphicsQueueFamilyIndex,
+                        uint32_t width, uint32_t height);
 
   /** Called when the window is resized to recreate the sawpchain */
   void recreateSwapchain(uint32_t w, uint32_t h); 
