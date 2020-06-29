@@ -31,11 +31,11 @@ static vk::UniquePipeline createGraphicsPipeline(
     std::string const &shaderDir,
     vk::Device device, uint32_t numColorAttachments,
     vk::PipelineLayout pipelineLayout,
-    vk::RenderPass renderPass) {
+    vk::RenderPass renderPass, std::string const &fragmentShaderFile) {
   vk::UniquePipelineCache pipelineCache = device.createPipelineCacheUnique({});
 
   auto vsm = createShaderModule(device, shaderDir + "/deferred.vert.spv");
-  auto fsm = createShaderModule(device, shaderDir + "/deferred.frag.spv");
+  auto fsm = createShaderModule(device, shaderDir + "/" + fragmentShaderFile);
 
   // TODO: clean up light count handling
   std::vector<vk::SpecializationMapEntry> entries = { vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),
@@ -106,20 +106,43 @@ void DeferredPass::initializePipeline(
     std::string shaderDir,
     std::vector<vk::DescriptorSetLayout> const &layouts,
     std::vector<vk::Format> const &outputFormats) {
+  mShaderDir = shaderDir;
+  mOutputFormats = outputFormats;
+  mLayouts = layouts;
+
   // contains information about what buffers 
   mPipelineLayout = mContext->getDevice().createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo(
       vk::PipelineLayoutCreateFlags(), layouts.size(), layouts.data()));
 
   mRenderPass = createRenderPass(mContext->getDevice(), outputFormats);
 
-  mPipeline = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
-                                     mPipelineLayout.get(), mRenderPass.get());
+  mPipelineLighting = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                     mPipelineLayout.get(), mRenderPass.get(), "deferred.frag.spv");
+
+  mPipelineNormal = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                     mPipelineLayout.get(), mRenderPass.get(), "deferred_normal.frag.spv");
+
+  mPipelineDepth = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                     mPipelineLayout.get(), mRenderPass.get(), "deferred_depth.frag.spv");
+  mPipeline = mPipelineLighting.get();
 }
 
 void DeferredPass::initializeFramebuffer(std::vector<vk::ImageView> const& outputImageViews,
                                         vk::Extent2D const &extent) {
   mFramebuffer = createFramebuffer(
       mContext->getDevice(), mRenderPass.get(), outputImageViews, {}, extent);
+}
+
+void DeferredPass::switchToNormalPipeline() {
+  mPipeline = mPipelineNormal.get();
+}
+
+void DeferredPass::switchToLightingPipeline() {
+  mPipeline = mPipelineLighting.get();
+}
+
+void DeferredPass::switchToDepthPipeline() {
+  mPipeline = mPipelineDepth.get();
 }
 
 }

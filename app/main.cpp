@@ -118,7 +118,9 @@ int main() {
 
   glfwSetWindowSizeCallback(vwindow->getWindow(), glfw_resize_callback);
 
+  int count = 0;
   while (!vwindow->isClosed()) {
+    count += 1;
 
     if (gSwapchainRebuild) {
       gSwapchainRebuild = false;
@@ -232,6 +234,16 @@ int main() {
     }
     if (vwindow->isKeyDown('d')) {
       cameraController.move(0, -r, 0);
+    }
+
+    if (count == 1000) {
+      renderer->switchToNormal();
+    }
+    if (count == 2000) {
+      renderer->switchToDepth();
+    }
+    if (count == 3000) {
+      renderer->switchToDepth();
     }
   }
   device.waitIdle();

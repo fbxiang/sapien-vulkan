@@ -9,8 +9,17 @@ class DeferredPass {
   VulkanContext *mContext;
   vk::UniqueRenderPass mRenderPass;
   vk::UniquePipelineLayout mPipelineLayout;
-  vk::UniquePipeline mPipeline;
+
+  vk::Pipeline mPipeline;
+
+  vk::UniquePipeline mPipelineLighting;
+  vk::UniquePipeline mPipelineNormal;
+  vk::UniquePipeline mPipelineDepth;
   vk::UniqueFramebuffer mFramebuffer;
+
+  std::string mShaderDir;
+  std::vector<vk::DescriptorSetLayout> mLayouts;
+  std::vector<vk::Format> mOutputFormats;
 
 public:
   DeferredPass(VulkanContext &context);
@@ -31,7 +40,11 @@ public:
   inline vk::Framebuffer getFramebuffer() { return mFramebuffer.get(); }
   inline vk::RenderPass getRenderPass() { return mRenderPass.get(); }
   inline vk::PipelineLayout getPipelineLayout() { return mPipelineLayout.get(); }
-  inline vk::Pipeline getPipeline() { return mPipeline.get(); }
+  inline vk::Pipeline getPipeline() { return mPipeline; }
+
+  void switchToNormalPipeline();
+  void switchToLightingPipeline();
+  void switchToDepthPipeline();
 };
 
 } // namespace svulkan

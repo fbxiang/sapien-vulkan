@@ -516,4 +516,18 @@ void VulkanRendererForEditor::updateAxisUBO() {
   }
 }
 
+
+void VulkanRendererForEditor::switchToLighting() {
+  mDeferredPass->switchToLightingPipeline();
+}
+
+void VulkanRendererForEditor::switchToNormal() {
+  mDeferredPass->switchToNormalPipeline();
+}
+
+void VulkanRendererForEditor::switchToDepth() {
+  mDeferredPass->switchToDepthPipeline();
+}
+
+
 } // namespace svulkan
