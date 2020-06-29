@@ -4,7 +4,7 @@
 namespace svulkan {
 class VulkanContext;
 
-class GBufferPass {
+class AxisPass {
   VulkanContext *mContext;
   vk::UniqueRenderPass mRenderPass;
   vk::UniquePipelineLayout mPipelineLayout;
@@ -12,18 +12,17 @@ class GBufferPass {
   vk::UniqueFramebuffer mFramebuffer;
 
 public:
-  GBufferPass(VulkanContext &context);
+  AxisPass(VulkanContext &context);
+  AxisPass(AxisPass const &other) = delete;
+  AxisPass &operator=(AxisPass const &other) = delete;
 
-  GBufferPass(GBufferPass const &other) = delete;
-  GBufferPass &operator=(GBufferPass const &other) = delete;
-
-  GBufferPass(GBufferPass &&other) = default;
-  GBufferPass &operator=(GBufferPass &&other) = default;
+  AxisPass(AxisPass &&other) = default;
+  AxisPass &operator=(AxisPass &&other) = default;
 
   void initializePipeline(std::string const &shaderDir,
                           std::vector<vk::DescriptorSetLayout> const &layouts,
                           std::vector<vk::Format> const &colorFormats, vk::Format depthFormat,
-                          vk::CullModeFlags cullMode, vk::FrontFace frontFace);
+                          vk::CullModeFlags cullMode, vk::FrontFace frontFace, uint32_t maxNumAxes);
   void initializeFramebuffer(std::vector<vk::ImageView> const &colorImageViews,
                              vk::ImageView depthImageView, vk::Extent2D const &extent);
 
@@ -32,5 +31,4 @@ public:
   inline vk::PipelineLayout getPipelineLayout() { return mPipelineLayout.get(); }
   inline vk::Pipeline getPipeline() { return mPipeline.get(); }
 };
-
 } // namespace svulkan

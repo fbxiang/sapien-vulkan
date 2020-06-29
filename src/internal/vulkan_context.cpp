@@ -1,30 +1,28 @@
 #include "sapien_vulkan/internal/vulkan_context.h"
+#include "sapien_vulkan/camera.h"
+#include "sapien_vulkan/data/geometry.hpp"
 #include "sapien_vulkan/internal/vulkan.h"
+#include "sapien_vulkan/internal/vulkan_material.h"
+#include "sapien_vulkan/internal/vulkan_object.h"
+#include "sapien_vulkan/internal/vulkan_renderer.h"
+#include "sapien_vulkan/internal/vulkan_renderer_for_editor.h"
+#include "sapien_vulkan/internal/vulkan_scene.h"
+#include "sapien_vulkan/internal/vulkan_texture.h"
+#include "sapien_vulkan/object.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
-#include "sapien_vulkan/internal/vulkan_material.h"
-#include "sapien_vulkan/internal/vulkan_object.h"
-#include "sapien_vulkan/object.h"
-#include "sapien_vulkan/internal/vulkan_scene.h"
 #include <iostream>
-#include "sapien_vulkan/internal/vulkan_renderer.h"
-#include "sapien_vulkan/camera.h"
-#include "sapien_vulkan/internal/vulkan_texture.h"
-#include "sapien_vulkan/data/geometry.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include "sapien_vulkan/common/stb_image.h"
 
+namespace svulkan {
 
-namespace svulkan
-{
-
-static void glfwErrorCallback(int error_code, const char* description) {
+static void glfwErrorCallback(int error_code, const char *description) {
   log::error("GLFW error: {}", description);
 }
-
 
 VulkanContext::VulkanContext(bool requirePresent) : mRequirePresent(requirePresent) {
   createInstance();
@@ -75,7 +73,8 @@ void VulkanContext::createInstance() {
 
 #ifdef VK_VALIDATION
   if (!checkValidationLayerSupport()) {
-    throw std::runtime_error("create instance failed: validation layers requested but not available");
+    throw std::runtime_error(
+        "create instance failed: validation layers requested but not available");
   }
   std::vector<const char *> enabledLayers = {"VK_LAYER_KHRONOS_validation"};
 #else
@@ -84,7 +83,6 @@ void VulkanContext::createInstance() {
 
   vk::ApplicationInfo appInfo("Vulkan Renderer", VK_MAKE_VERSION(0, 0, 1), "No Engine",
                               VK_MAKE_VERSION(0, 0, 1), VK_API_VERSION_1_1);
-
 
   auto extensionProperties = vk::enumerateInstanceExtensionProperties(nullptr);
   std::string allExtensions;
@@ -124,21 +122,26 @@ void VulkanContext::createInstance() {
   mInstance = vk::createInstanceUnique(createInfo);
 }
 
-void VulkanContext::pickPhysicalDevice() { mPhysicalDevice = mInstance->enumeratePhysicalDevices().front(); }
+void VulkanContext::pickPhysicalDevice() {
+  mPhysicalDevice = mInstance->enumeratePhysicalDevices().front();
+}
 
 void VulkanContext::createLogicalDevice() {
-  std::vector<vk::QueueFamilyProperties> queueFamilyProperties = mPhysicalDevice.getQueueFamilyProperties();
-  graphicsQueueFamilyIndex = std::distance(
-      queueFamilyProperties.begin(), std::find_if(queueFamilyProperties.begin(), queueFamilyProperties.end(),
-                                                  [](vk::QueueFamilyProperties const &qfp) {
-                                                    return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
-                                                  }));
+  std::vector<vk::QueueFamilyProperties> queueFamilyProperties =
+      mPhysicalDevice.getQueueFamilyProperties();
+  graphicsQueueFamilyIndex =
+      std::distance(queueFamilyProperties.begin(),
+                    std::find_if(queueFamilyProperties.begin(), queueFamilyProperties.end(),
+                                 [](vk::QueueFamilyProperties const &qfp) {
+                                   return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
+                                 }));
   assert(graphicsQueueFamilyIndex < queueFamilyProperties.size());
 
   float queuePriority = 0.0f;
-  vk::DeviceQueueCreateInfo deviceQueueCreateInfo(
-      vk::DeviceQueueCreateFlags(), static_cast<uint32_t>(graphicsQueueFamilyIndex), 1, &queuePriority);
-  std::vector<const char *> deviceExtensions {};
+  vk::DeviceQueueCreateInfo deviceQueueCreateInfo(vk::DeviceQueueCreateFlags(),
+                                                  static_cast<uint32_t>(graphicsQueueFamilyIndex),
+                                                  1, &queuePriority);
+  std::vector<const char *> deviceExtensions{};
 
 #ifdef ON_SCREEN
   if (mRequirePresent) {
@@ -150,78 +153,83 @@ void VulkanContext::createLogicalDevice() {
                            deviceExtensions.size(), deviceExtensions.data()));
 }
 
-vk::Queue VulkanContext::getGraphicsQueue() const { return mDevice->getQueue(graphicsQueueFamilyIndex, 0); }
+vk::Queue VulkanContext::getGraphicsQueue() const {
+  return mDevice->getQueue(graphicsQueueFamilyIndex, 0);
+}
 
 void VulkanContext::createCommandPool() {
-  mCommandPool = mDevice->createCommandPoolUnique(
-      vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, graphicsQueueFamilyIndex));
+  mCommandPool = mDevice->createCommandPoolUnique(vk::CommandPoolCreateInfo(
+      vk::CommandPoolCreateFlagBits::eResetCommandBuffer, graphicsQueueFamilyIndex));
 }
 
 void VulkanContext::createDescriptorPool() {
   // constexpr uint32_t numMaterials = 100;
   // constexpr uint32_t numTextures = 100;
-  mDescriptorPool = svulkan::createDescriptorPool(mDevice.get(), {
-      // {vk::DescriptorType::eUniformBuffer, numMaterials},
-      // {vk::DescriptorType::eCombinedImageSampler, numTextures},
-      { vk::DescriptorType::eSampler, 1000 },
-      { vk::DescriptorType::eCombinedImageSampler, 1000 },
-      { vk::DescriptorType::eSampledImage, 1000 },
-      { vk::DescriptorType::eStorageImage, 1000 },
-      { vk::DescriptorType::eUniformTexelBuffer, 1000 },
-      { vk::DescriptorType::eStorageTexelBuffer, 1000 },
-      { vk::DescriptorType::eUniformBuffer, 1000 },
-      { vk::DescriptorType::eStorageBuffer, 1000 },
-      { vk::DescriptorType::eUniformBufferDynamic, 1000 },
-      { vk::DescriptorType::eStorageBufferDynamic, 1000 },
-      { vk::DescriptorType::eInputAttachment, 1000 }
-    });
+  mDescriptorPool = svulkan::createDescriptorPool(
+      mDevice.get(), {// {vk::DescriptorType::eUniformBuffer, numMaterials},
+                      // {vk::DescriptorType::eCombinedImageSampler, numTextures},
+                      {vk::DescriptorType::eSampler, 1000},
+                      {vk::DescriptorType::eCombinedImageSampler, 1000},
+                      {vk::DescriptorType::eSampledImage, 1000},
+                      {vk::DescriptorType::eStorageImage, 1000},
+                      {vk::DescriptorType::eUniformTexelBuffer, 1000},
+                      {vk::DescriptorType::eStorageTexelBuffer, 1000},
+                      {vk::DescriptorType::eUniformBuffer, 1000},
+                      {vk::DescriptorType::eStorageBuffer, 1000},
+                      {vk::DescriptorType::eUniformBufferDynamic, 1000},
+                      {vk::DescriptorType::eStorageBufferDynamic, 1000},
+                      {vk::DescriptorType::eInputAttachment, 1000}});
 }
 
 void VulkanContext::initializeDescriptorSetLayouts() {
   // uniform buffers
-  mDescriptorSetLayouts.scene = 
-      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
-            1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
+  mDescriptorSetLayouts.scene = createDescriptorSetLayout(
+      getDevice(), {{vk::DescriptorType::eUniformBuffer, 1,
+                     vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
 
-  mDescriptorSetLayouts.camera = 
-      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
-            1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
+  mDescriptorSetLayouts.camera = createDescriptorSetLayout(
+      getDevice(), {{vk::DescriptorType::eUniformBuffer, 1,
+                     vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}});
 
-  mDescriptorSetLayouts.object = 
-      createDescriptorSetLayout(getDevice(), {{vk::DescriptorType::eUniformBuffer,
-            1, vk::ShaderStageFlagBits::eVertex}});
+  mDescriptorSetLayouts.object = createDescriptorSetLayout(
+      getDevice(), {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex}});
 
-  mDescriptorSetLayouts.material = 
-      createDescriptorSetLayout(
-          getDevice(),
-          {{vk::DescriptorType::eUniformBuffer, 1,  vk::ShaderStageFlagBits::eFragment},
-           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
-           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
-           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
-           {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}
-          });
+  mDescriptorSetLayouts.material = createDescriptorSetLayout(
+      getDevice(),
+      {{vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment},
+       {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+       {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+       {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+       {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}});
 
-  mDescriptorSetLayouts.deferred = createDescriptorSetLayout(
-      getDevice(), {
-        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // albedo
-        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // position
-        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // specular
-        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},  // normal
-        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}  // depth
-      });
+  mDescriptorSetLayouts.deferred =
+      createDescriptorSetLayout(getDevice(), {
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // albedo
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // position
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // specular
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // normal
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment} // depth
+                                             });
 }
 
 std::shared_ptr<VulkanTextureData> VulkanContext::getPlaceholderTexture() {
   if (!mPlaceholderTexture) {
-    mPlaceholderTexture = std::make_shared<VulkanTextureData>(
-        getPhysicalDevice(), getDevice(), vk::Extent2D{1u, 1u});
-    mPlaceholderTexture->setImage(getPhysicalDevice(), getDevice(), getCommandPool(), getGraphicsQueue(),
+    mPlaceholderTexture = std::make_shared<VulkanTextureData>(getPhysicalDevice(), getDevice(),
+                                                              vk::Extent2D{1u, 1u});
+    mPlaceholderTexture->setImage(getPhysicalDevice(), getDevice(), getCommandPool(),
+                                  getGraphicsQueue(),
                                   [&](void *target, vk::Extent2D const &extent) {});
   }
   return mPlaceholderTexture;
 }
 
-std::shared_ptr<struct VulkanTextureData> VulkanContext::loadTexture(std::string const &filename) const {
+std::shared_ptr<struct VulkanTextureData>
+VulkanContext::loadTexture(std::string const &filename) const {
   int width, height, nrChannels;
   unsigned char *data = stbi_load(filename.c_str(), &width, &height, &nrChannels, STBI_rgb_alpha);
   auto texture = std::make_shared<VulkanTextureData>(
@@ -250,14 +258,12 @@ std::unique_ptr<Object> VulkanContext::loadCube() {
   std::vector vertices = FlatCubeVertices;
   std::vector indices = FlatCubeIndices;
   if (!mCubeMesh) {
-    mCubeMesh = std::make_shared<VulkanMesh>(
-        getPhysicalDevice(), getDevice(), mCommandPool.get(),
-        getGraphicsQueue(), vertices, indices, false);
+    mCubeMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                             getGraphicsQueue(), vertices, indices, false);
   }
 
-  std::unique_ptr<VulkanObject> vobj =
-      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
-                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  std::unique_ptr<VulkanObject> vobj = std::make_unique<VulkanObject>(
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
   vobj->setMesh(mCubeMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
@@ -295,20 +301,20 @@ std::unique_ptr<Object> VulkanContext::loadSphere() {
         indices.push_back(rightUp);
       }
 
-      if (i < (stacks-1) * slices) {
+      if (i < (stacks - 1) * slices) {
         indices.push_back(i);
         indices.push_back(rightUp);
         indices.push_back(up);
       }
     }
 
-    mSphereMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
-                                              getGraphicsQueue(), vertices, indices, false);
+    mSphereMesh =
+        std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                     getGraphicsQueue(), vertices, indices, false);
   }
 
-  std::unique_ptr<VulkanObject> vobj =
-      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
-                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  std::unique_ptr<VulkanObject> vobj = std::make_unique<VulkanObject>(
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
   vobj->setMesh(mSphereMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
@@ -318,7 +324,7 @@ std::unique_ptr<Object> VulkanContext::loadSphere() {
 }
 
 std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLength) {
-  std::shared_ptr<VulkanMesh> vulkanMesh {nullptr};
+  std::shared_ptr<VulkanMesh> vulkanMesh{nullptr};
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   uint32_t stacks = 20;
@@ -390,7 +396,7 @@ std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLengt
     uint32_t right = (i + 1) % slices + idx;
     uint32_t up = i + slices;
     uint32_t rightUp = right + slices;
-    
+
     indices.push_back(i);
     indices.push_back(right);
     indices.push_back(rightUp);
@@ -403,9 +409,8 @@ std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLengt
   vulkanMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
                                             getGraphicsQueue(), vertices, indices, false);
 
-  std::unique_ptr<VulkanObject> vobj =
-      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
-                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  std::unique_ptr<VulkanObject> vobj = std::make_unique<VulkanObject>(
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
   vobj->setMesh(vulkanMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
@@ -415,21 +420,20 @@ std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLengt
 }
 
 std::unique_ptr<Object> VulkanContext::loadYZPlane() {
-  if (!mYZPlaneMesh)
-  {
+  if (!mYZPlaneMesh) {
     std::vector<Vertex> vertices = {{{0, -1, -1}, {1, 0, 0}, {0, 0}, {0, 1, 0}, {0, 0, 1}},
                                     {{0, 1, -1}, {1, 0, 0}, {1, 0}, {0, 1, 0}, {0, 0, 1}},
                                     {{0, -1, 1}, {1, 0, 0}, {0, 1}, {0, 1, 0}, {0, 0, 1}},
                                     {{0, 1, 1}, {1, 0, 0}, {1, 1}, {0, 1, 0}, {0, 0, 1}}};
-    std::vector<uint32_t> indices = { 0, 1, 3, 0, 3, 2 };
+    std::vector<uint32_t> indices = {0, 1, 3, 0, 3, 2};
 
-  mYZPlaneMesh = std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
-                                            getGraphicsQueue(), vertices, indices, false);
+    mYZPlaneMesh =
+        std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                     getGraphicsQueue(), vertices, indices, false);
   }
 
-  std::unique_ptr<VulkanObject> vobj =
-      std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
-                                     mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+  std::unique_ptr<VulkanObject> vobj = std::make_unique<VulkanObject>(
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
   vobj->setMesh(mYZPlaneMesh);
   std::shared_ptr<VulkanMaterial> mat = createMaterial();
   vobj->setMaterial(mat);
@@ -438,26 +442,26 @@ std::unique_ptr<Object> VulkanContext::loadYZPlane() {
   return obj;
 }
 
-std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string const &file,
-                                                                glm::vec3 scale,
-                                                                bool ignoreRootTransform,
-                                                                glm::vec3 const &up,
-                                                                glm::vec3 const &forward) {
+std::vector<std::unique_ptr<Object>>
+VulkanContext::loadObjects(std::string const &file, glm::vec3 scale, bool ignoreRootTransform,
+                           glm::vec3 const &up, glm::vec3 const &forward) {
 
   glm::mat3 formatTransform = glm::mat3(glm::cross(forward, up), up, -forward);
   std::vector<std::unique_ptr<Object>> objects;
   Assimp::Importer importer;
-  uint32_t flags = aiProcess_CalcTangentSpace | aiProcess_Triangulate |
-                   aiProcess_GenNormals | aiProcess_FlipUVs | aiProcess_PreTransformVertices;
+  uint32_t flags = aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenNormals |
+                   aiProcess_FlipUVs | aiProcess_PreTransformVertices;
   const aiScene *scene = importer.ReadFile(file, flags);
   if (scene->mRootNode->mMetaData) {
     throw std::runtime_error("Failed to load scene: metadata is not supported, " + file);
   }
   if (!scene) {
-    throw std::runtime_error("Failed to load scene: " + std::string(importer.GetErrorString()) + ", " + file);
+    throw std::runtime_error("Failed to load scene: " + std::string(importer.GetErrorString()) +
+                             ", " + file);
   }
 
-  // printf("Loaded %d meshes, %d materials, %d textures\n", scene->mNumMeshes, scene->mNumMaterials,
+  // printf("Loaded %d meshes, %d materials, %d textures\n", scene->mNumMeshes,
+  // scene->mNumMaterials,
   //        scene->mNumTextures);
 
   std::vector<std::shared_ptr<VulkanMaterial>> mats;
@@ -466,7 +470,7 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
     auto *m = scene->mMaterials[i];
     PBRMaterialUBO matSpec;
 
-    aiColor3D color{0,0,0};
+    aiColor3D color{0, 0, 0};
     float alpha = 1.f;
     float shininess = 0.f;
     m->Get(AI_MATKEY_OPACITY, alpha);
@@ -535,25 +539,27 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
     for (uint32_t v = 0; v < mesh->mNumVertices; v++) {
       glm::vec3 normal = glm::vec3(0);
       glm::vec2 texcoord = glm::vec2(0);
-      glm::vec3 position = formatTransform *
-                           glm::vec3(mesh->mVertices[v].x, mesh->mVertices[v].y, mesh->mVertices[v].z);
+      glm::vec3 position = formatTransform * glm::vec3(mesh->mVertices[v].x, mesh->mVertices[v].y,
+                                                       mesh->mVertices[v].z);
       glm::vec3 tangent = glm::vec3(0);
       glm::vec3 bitangent = glm::vec3(0);
       if (mesh->HasNormals()) {
-        normal = formatTransform * glm::vec3(mesh->mNormals[v].x, mesh->mNormals[v].y, mesh->mNormals[v].z);
+        normal = formatTransform *
+                 glm::vec3(mesh->mNormals[v].x, mesh->mNormals[v].y, mesh->mNormals[v].z);
       }
       if (mesh->HasTextureCoords(0)) {
         texcoord = {mesh->mTextureCoords[0][v].x, mesh->mTextureCoords[0][v].y};
       }
       if (mesh->HasTangentsAndBitangents()) {
-        tangent =
-            formatTransform * glm::vec3(mesh->mTangents[v].x, mesh->mTangents[v].y, mesh->mTangents[v].z);
-        bitangent = formatTransform *
-                    glm::vec3(mesh->mBitangents[v].x, mesh->mBitangents[v].y, mesh->mBitangents[v].z);
+        tangent = formatTransform *
+                  glm::vec3(mesh->mTangents[v].x, mesh->mTangents[v].y, mesh->mTangents[v].z);
+        bitangent = formatTransform * glm::vec3(mesh->mBitangents[v].x, mesh->mBitangents[v].y,
+                                                mesh->mBitangents[v].z);
       }
 
       // FIXME: remove
-      // printf("{{%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}},\n",
+      // printf("{{%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff}, {%.3ff,%.3ff}, {%.3ff,%.3ff,%.3ff},
+      // {%.3ff,%.3ff,%.3ff}},\n",
       //        position.x, position.y, position.z,
       //        normal.x, normal.y, normal.z,
       //        texcoord.x, texcoord.y,
@@ -572,20 +578,20 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
       indices.push_back(face.mIndices[1]);
       indices.push_back(face.mIndices[2]);
     }
-    
+
     // FIXME: remove
     // for (uint32_t i = 0; i < indices.size(); ++i) {
     //   printf("%d,", indices[i]);
     // }
     // printf("\n");
 
-    std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
-        getPhysicalDevice(), getDevice(), mCommandPool.get(),
-        getGraphicsQueue(), vertices, indices, !mesh->HasNormals());
+    std::shared_ptr<VulkanMesh> vulkanMesh =
+        std::make_shared<VulkanMesh>(getPhysicalDevice(), getDevice(), mCommandPool.get(),
+                                     getGraphicsQueue(), vertices, indices, !mesh->HasNormals());
 
     std::unique_ptr<VulkanObject> vobj =
-        std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(),
-                                       mDescriptorPool.get(), mDescriptorSetLayouts.object.get());
+        std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(), mDescriptorPool.get(),
+                                       mDescriptorSetLayouts.object.get());
     vobj->setMesh(vulkanMesh);
     vobj->setMaterial(mats[mesh->mMaterialIndex]);
     std::unique_ptr<Object> object = std::make_unique<Object>(std::move(vobj));
@@ -597,29 +603,35 @@ std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string cons
 
 std::shared_ptr<VulkanMaterial> VulkanContext::createMaterial() {
   auto mat = std::make_shared<VulkanMaterial>(
-      getPhysicalDevice(), getDevice(), mDescriptorPool.get(), mDescriptorSetLayouts.material.get(),
-      getPlaceholderTexture());
+      getPhysicalDevice(), getDevice(), mDescriptorPool.get(),
+      mDescriptorSetLayouts.material.get(), getPlaceholderTexture());
   mat->setProperties({});
   return mat;
 }
 
 std::unique_ptr<VulkanScene> VulkanContext::createVulkanScene() const {
-  return std::make_unique<VulkanScene>(
-      getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().scene.get());
+  return std::make_unique<VulkanScene>(getPhysicalDevice(), getDevice(), getDescriptorPool(),
+                                       getDescriptorSetLayouts().scene.get());
 }
 
 std::unique_ptr<VulkanObject> VulkanContext::createVulkanObject() const {
-  return std::make_unique<VulkanObject>(
-      getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().object.get());
+  return std::make_unique<VulkanObject>(getPhysicalDevice(), getDevice(), getDescriptorPool(),
+                                        getDescriptorSetLayouts().object.get());
 }
 
-std::unique_ptr<VulkanRenderer> VulkanContext::createVulkanRenderer(VulkanRendererConfig const &config) {
+std::unique_ptr<VulkanRenderer>
+VulkanContext::createVulkanRenderer(VulkanRendererConfig const &config) {
   return std::make_unique<VulkanRenderer>(*this, config);
 }
 
+std::unique_ptr<VulkanRendererForEditor>
+VulkanContext::createVulkanRendererForEditor(VulkanRendererConfig const &config) {
+  return std::make_unique<VulkanRendererForEditor>(*this, config);
+}
+
 std::unique_ptr<struct Camera> VulkanContext::createCamera() const {
-  return std::make_unique<Camera>(
-      getPhysicalDevice(), getDevice(), getDescriptorPool(), getDescriptorSetLayouts().camera.get());
+  return std::make_unique<Camera>(getPhysicalDevice(), getDevice(), getDescriptorPool(),
+                                  getDescriptorSetLayouts().camera.get());
 }
 
 VulkanContext::~VulkanContext() {
@@ -632,21 +644,17 @@ VulkanContext::~VulkanContext() {
 
 #ifdef ON_SCREEN
 std::unique_ptr<VulkanWindow> VulkanContext::createWindow(uint32_t width, uint32_t height) {
-  return std::make_unique<VulkanWindow>(getInstance(), getDevice(), getPhysicalDevice(),
-                                        getGraphicsQueueFamilyIndex(),
-                                        std::vector{vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm,
-                                          vk::Format::eB8G8R8Unorm, vk::Format::eR8G8B8Unorm},
-                                        vk::ColorSpaceKHR::eSrgbNonlinear, width, height);
+  return std::make_unique<VulkanWindow>(
+      getInstance(), getDevice(), getPhysicalDevice(), getGraphicsQueueFamilyIndex(),
+      std::vector{vk::Format::eB8G8R8A8Unorm, vk::Format::eR8G8B8A8Unorm, vk::Format::eB8G8R8Unorm,
+                  vk::Format::eR8G8B8Unorm},
+      vk::ColorSpaceKHR::eSrgbNonlinear, width, height);
 }
 #endif
-
-
 
 // static members
 
 std::string VulkanContext::gDefaultShaderDir{"spv"};
-void VulkanContext::setDefaultShaderDir(std::string const &dir) {
-  gDefaultShaderDir = dir;
-}
+void VulkanContext::setDefaultShaderDir(std::string const &dir) { gDefaultShaderDir = dir; }
 
-}
+} // namespace svulkan

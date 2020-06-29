@@ -1,7 +1,9 @@
 #include "sapien_vulkan/internal/vulkan_context.h"
 #include "sapien_vulkan/internal/vulkan_renderer.h"
+#include "sapien_vulkan/internal/vulkan_renderer_for_editor.h"
 #include "sapien_vulkan/scene.h"
 #include "sapien_vulkan/common/log.h"
+#include "sapien_vulkan/pass/axis.h"
 #include "sapien_vulkan/pass/gbuffer.h"
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/camera.h"
@@ -66,10 +68,10 @@ void LoadSponza(VulkanContext &context, Scene &scene) {
 
 void LoadCustom(VulkanContext &context, Scene &scene) {
   // scene.addObject(context.loadCube({0.1, 0.1, 0.1}));
-  auto obj = context.loadSphere();
-  obj->mTransform.scale = {0.1, 0.1, 0.1};
-  obj->mTransform.position = {0, 0.3, 0};
-  scene.addObject(std::move(obj));
+  // auto obj = context.loadSphere();
+  // obj->mTransform.scale = {0.1, 0.1, 0.1};
+  // obj->mTransform.position = {0, 0.3, 0};
+  // scene.addObject(std::move(obj));
   // scene.addObject(context.loadYZPlane({1, 1}));
   // auto obj = context.loadCapsule(0.1, 0.1);
   // scene.addObject(std::move(obj));
@@ -78,7 +80,14 @@ void LoadCustom(VulkanContext &context, Scene &scene) {
 int main() {
   VulkanContext context;
   auto device = context.getDevice();
-  auto renderer = context.createVulkanRenderer();
+  auto renderer = context.createVulkanRendererForEditor();
+  auto m = glm::mat4(1);
+  m[0][0] = 0.1;
+  m[1][1] = 0.1;
+  m[2][2] = 0.1;
+  renderer->addAxes(m);
+  m[3][1] = 3;
+  renderer->addAxes(m);
   auto scene = Scene(context.createVulkanScene());
   LoadCustom(context, scene);
   LoadSponza(context, scene);

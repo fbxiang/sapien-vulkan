@@ -28,7 +28,6 @@ void VulkanRenderer::resize(int width, int height) {
 }
 
 void VulkanRenderer::initializeRenderTextures() {
-  // mRenderTargetFormats.colorFormat = vk::Format::eR8G8B8A8Unorm;
   mRenderTargetFormats.colorFormat = vk::Format::eR32G32B32A32Sfloat;
   mRenderTargetFormats.segmentationFormat = vk::Format::eR32G32B32A32Uint;
   mRenderTargetFormats.depthFormat = vk::Format::eD32Sfloat;
