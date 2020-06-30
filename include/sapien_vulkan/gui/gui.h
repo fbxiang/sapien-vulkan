@@ -65,6 +65,7 @@ class VulkanWindow {
 
   ImVec2 mMousePos{0,0};
   ImVec2 mMouseDelta{0,0};
+  ImVec2 mMouseWheelDelta{0,0};
 
   bool mClosed = false;
 
@@ -79,8 +80,12 @@ class VulkanWindow {
   void newFrame();
 
   bool isKeyDown(char key); 
+
+  bool isKeyPressed(char key); 
   
   ImVec2 getMouseDelta(); 
+
+  ImVec2 getMouseWheelDelta(); 
 
   ImVec2 getMousePosition();
 

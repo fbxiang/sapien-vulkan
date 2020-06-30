@@ -40,18 +40,38 @@ void VulkanWindow::newFrame() {
   }
   mMousePos = mousePos;
 
+  if (ImGui::GetIO().WantCaptureMouse) {
+    mMouseWheelDelta = {0, 0};
+  } else {
+    mMouseWheelDelta = {ImGui::GetIO().MouseWheel, ImGui::GetIO().MouseWheelH};
+  }
+
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
 }
 
 bool VulkanWindow::isKeyDown(char key) {
+  if (ImGui::GetIO().WantTextInput || ImGui::GetIO().WantCaptureKeyboard) {
+    return false;
+  }
   return ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
+}
+
+bool VulkanWindow::isKeyPressed(char key) {
+  if (ImGui::GetIO().WantTextInput || ImGui::GetIO().WantCaptureKeyboard) {
+    return false;
+  }
+  return ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
 }
 
 ImVec2 VulkanWindow::getMouseDelta() {
   mMouseDelta.x = std::clamp(mMouseDelta.x, -100.f, 100.f);
   mMouseDelta.y = std::clamp(mMouseDelta.y, -100.f, 100.f);
   return mMouseDelta;
+}
+
+ImVec2 VulkanWindow::getMouseWheelDelta() {
+  return mMouseWheelDelta;
 }
 
 ImVec2 VulkanWindow::getMousePosition() {
