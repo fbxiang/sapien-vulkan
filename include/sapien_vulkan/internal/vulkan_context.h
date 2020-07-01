@@ -5,6 +5,7 @@
 #include "sapien_vulkan/pass/gbuffer.h"
 #include "sapien_vulkan/pass/axis.h"
 #include "sapien_vulkan/pass/transparency.h"
+#include "sapien_vulkan/pass/composite.h"
 #include "vulkan_renderer_config.h"
 #include <vulkan/vulkan.hpp>
 
@@ -73,6 +74,7 @@ private:
     vk::UniqueDescriptorSetLayout object;
 
     vk::UniqueDescriptorSetLayout deferred;
+    vk::UniqueDescriptorSetLayout composite;
   } mDescriptorSetLayouts;
 
 private:

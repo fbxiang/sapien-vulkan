@@ -7,6 +7,7 @@
 #include "sapien_vulkan/pass/gbuffer.h"
 #include "sapien_vulkan/pass/transparency.h"
 #include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/pass/composite.h"
 #include "sapien_vulkan/camera.h"
 #include "sapien_vulkan/camera_controller.h"
 
@@ -86,8 +87,8 @@ void LoadCustom(VulkanContext &context, Scene &scene) {
 int main() {
   VulkanContext context;
   auto device = context.getDevice();
-  // auto renderer = context.createVulkanRendererForEditor();
-  auto renderer = context.createVulkanRenderer();
+  auto renderer = context.createVulkanRendererForEditor();
+  // auto renderer = context.createVulkanRenderer();
   auto m = glm::mat4(1);
   m[0][0] = 0.1;
   m[1][1] = 0.1;
@@ -243,15 +244,15 @@ int main() {
       cameraController.move(0, -r, 0);
     }
 
-    // if (count == 1000) {
-    //   renderer->switchToNormal();
-    // }
-    // if (count == 2000) {
-    //   renderer->switchToDepth();
-    // }
-    // if (count == 3000) {
-    //   renderer->switchToDepth();
-    // }
+    if (count == 1000) {
+      renderer->switchToNormal();
+    }
+    if (count == 2000) {
+      renderer->switchToDepth();
+    }
+    if (count == 3000) {
+      renderer->switchToDepth();
+    }
   }
   device.waitIdle();
 

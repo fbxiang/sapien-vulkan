@@ -3,6 +3,7 @@
 #include "sapien_vulkan/data/geometry.hpp"
 #include "sapien_vulkan/internal/vulkan_context.h"
 #include "sapien_vulkan/pass/axis.h"
+#include "sapien_vulkan/pass/composite.h"
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
 #include "sapien_vulkan/pass/transparency.h"
@@ -17,6 +18,7 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
   mDeferredPass = std::make_unique<DeferredPass>(context);
   mAxisPass = std::make_unique<AxisPass>(context);
   mTransparencyPass = std::make_unique<TransparencyPass>(context);
+  mCompositePass = std::make_unique<CompositePass>(context);
 
   mDeferredDescriptorSet =
       std::move(mContext->getDevice()
@@ -25,6 +27,12 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
                         &mContext->getDescriptorSetLayouts().deferred.get()))
                     .front());
   prepareAxesResources();
+  mCompositeDescriptorSet =
+      std::move(mContext->getDevice()
+                    .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
+                        mContext->getDescriptorPool(), 1,
+                        &mContext->getDescriptorSetLayouts().composite.get()))
+                    .front());
 }
 
 void VulkanRendererForEditor::resize(int width, int height) {
@@ -98,6 +106,14 @@ void VulkanRendererForEditor::initializeRenderTextures() {
       vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal,
       vk::ImageAspectFlagBits::eColor);
 
+  mRenderTargets.lighting2 = std::make_unique<VulkanImageData>(
+      mContext->getPhysicalDevice(), mContext->getDevice(), mRenderTargetFormats.colorFormat,
+      vk::Extent2D(mWidth, mHeight), 1, vk::ImageTiling::eOptimal,
+      vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+          vk::ImageUsageFlagBits::eTransferSrc,
+      vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal,
+      vk::ImageAspectFlagBits::eColor);
+
   auto commandBuffer = createCommandBuffer(mContext->getDevice(), mContext->getCommandPool(),
                                            vk::CommandBufferLevel::ePrimary);
 
@@ -127,6 +143,13 @@ void VulkanRendererForEditor::initializeRenderTextures() {
             vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
         transitionImageLayout(
             commandBuffer, mRenderTargets.lighting.get()->mImage.get(),
+            mRenderTargetFormats.colorFormat, vk::ImageLayout::eUndefined,
+            vk::ImageLayout::eColorAttachmentOptimal, {},
+            vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+            vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+        transitionImageLayout(
+            commandBuffer, mRenderTargets.lighting2.get()->mImage.get(),
             mRenderTargetFormats.colorFormat, vk::ImageLayout::eUndefined,
             vk::ImageLayout::eColorAttachmentOptimal, {},
             vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
@@ -162,6 +185,30 @@ void VulkanRendererForEditor::initializeRenderTextures() {
                               vk::ImageLayout::eShaderReadOnlyOptimal)};
   std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {vk::WriteDescriptorSet(
       mDeferredDescriptorSet.get(), 0, 0, imageInfos.size(),
+      vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
+  mContext->getDevice().updateDescriptorSets(writeDescriptorSets, nullptr);
+
+  // bind textures to composite descriptor set
+  mCompositeSampler = mContext->getDevice().createSamplerUnique(vk::SamplerCreateInfo(
+      vk::SamplerCreateFlags(), vk::Filter::eNearest, vk::Filter::eNearest,
+      vk::SamplerMipmapMode::eNearest, vk::SamplerAddressMode::eClampToBorder,
+      vk::SamplerAddressMode::eClampToBorder, vk::SamplerAddressMode::eClampToBorder, 0.f, false,
+      0.f, false, vk::CompareOp::eNever, 0.f, 0.f, vk::BorderColor::eFloatOpaqueBlack));
+  imageInfos = {
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.lighting->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal),
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.albedo->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal),
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.position->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal),
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.specular->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal),
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.normal->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal),
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.depth->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal)};
+  writeDescriptorSets = {vk::WriteDescriptorSet(
+      mCompositeDescriptorSet.get(), 0, 0, imageInfos.size(),
       vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
   mContext->getDevice().updateDescriptorSets(writeDescriptorSets, nullptr);
 }
@@ -245,6 +292,15 @@ void VulkanRendererForEditor::initializeRenderPasses() {
          mRenderTargets.position->mImageView.get(), mRenderTargets.specular->mImageView.get(),
          mRenderTargets.normal->mImageView.get(), mRenderTargets.segmentation->mImageView.get()},
         mRenderTargets.depth->mImageView.get(),
+        {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
+  }
+
+  // initialize composite pass
+  {
+    std::vector<vk::DescriptorSetLayout> layouts = {l.composite.get()};
+    mCompositePass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat});
+    mCompositePass->initializeFramebuffer(
+        {mRenderTargets.lighting2->mImageView.get()},
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
   }
 }
@@ -423,7 +479,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   if (scene.getTransparentObjects().size()) {
     std::vector<vk::ClearValue> clearValues;
     clearValues.resize(7);
-    vk::RenderPassBeginInfo renderPassBeginInfo {
+    vk::RenderPassBeginInfo renderPassBeginInfo{
         mTransparencyPass->getRenderPass(), mTransparencyPass->getFramebuffer(),
         vk::Rect2D({0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}),
         static_cast<uint32_t>(clearValues.size()), clearValues.data()};
@@ -451,8 +507,8 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
                                          mTransparencyPass->getPipelineLayout(), 3,
                                          vobj->mMaterial->getDescriptorSet(), nullptr);
         commandBuffer.pushConstants<float>(mTransparencyPass->getPipelineLayout(),
-                                           vk::ShaderStageFlagBits::eFragment,
-                                           0, obj->mVisibility);
+                                           vk::ShaderStageFlagBits::eFragment, 0,
+                                           obj->mVisibility);
 
         commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
         commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0,
@@ -462,12 +518,76 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     }
     commandBuffer.endRenderPass();
   }
+
+  // composite pass
+  {
+    // transition to texture formats
+    for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
+                     mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
+                     mRenderTargets.normal->mImage.get()}) {
+      transitionImageLayout(
+          commandBuffer, img, mRenderTargetFormats.colorFormat,
+          vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+          vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
+          vk::PipelineStageFlagBits::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eColor);
+    }
+    transitionImageLayout(
+        commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+        vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::AccessFlagBits::eDepthStencilAttachmentWrite, vk::AccessFlagBits::eShaderRead,
+        vk::PipelineStageFlagBits::eEarlyFragmentTests |
+            vk::PipelineStageFlagBits::eLateFragmentTests,
+        vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eDepth);
+
+    std::vector<vk::ClearValue> clearValues = {
+        vk::ClearColorValue{std::array{0.f, 0.f, 0.f, 1.f}}};
+    vk::RenderPassBeginInfo renderPassBeginInfo{
+        mCompositePass->getRenderPass(), mCompositePass->getFramebuffer(),
+        vk::Rect2D{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}},
+        static_cast<uint32_t>(clearValues.size()), clearValues.data()};
+    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mCompositePass->getPipeline());
+    commandBuffer.setViewport(
+        0, {{0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}});
+    commandBuffer.setScissor(
+        0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                     mCompositePass->getPipelineLayout(), 0,
+                                     mCompositeDescriptorSet.get(), nullptr);
+
+    commandBuffer.draw(3, 1, 0, 0);
+    commandBuffer.endRenderPass();
+
+    // transition textures back to gbuffer formats
+    for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
+        mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
+        mRenderTargets.normal->mImage.get()}) {
+      transitionImageLayout(
+          commandBuffer, img, mRenderTargetFormats.colorFormat,
+          vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
+          vk::AccessFlagBits::eShaderRead,
+          vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+          vk::PipelineStageFlagBits::eFragmentShader,
+          vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+    }
+    transitionImageLayout(
+        commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        vk::AccessFlagBits::eShaderRead,
+        vk::AccessFlagBits::eDepthStencilAttachmentRead |
+            vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::PipelineStageFlagBits::eEarlyFragmentTests |
+            vk::PipelineStageFlagBits::eLateFragmentTests,
+        vk::ImageAspectFlagBits::eDepth);
+  }
 }
 
 void VulkanRendererForEditor::display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage,
                                       vk::Format swapchainFormat, uint32_t width,
                                       uint32_t height) {
-  auto &img = mRenderTargets.lighting;
+  auto &img = mRenderTargets.lighting2;
 
   transitionImageLayout(
       commandBuffer, img->mImage.get(), mRenderTargetFormats.colorFormat,
@@ -586,10 +706,10 @@ void VulkanRendererForEditor::updateAxisUBO() {
   }
 }
 
-void VulkanRendererForEditor::switchToLighting() { mDeferredPass->switchToLightingPipeline(); }
+void VulkanRendererForEditor::switchToLighting() { mCompositePass->switchToLightingPipeline(); }
 
-void VulkanRendererForEditor::switchToNormal() { mDeferredPass->switchToNormalPipeline(); }
+void VulkanRendererForEditor::switchToNormal() { mCompositePass->switchToNormalPipeline(); }
 
-void VulkanRendererForEditor::switchToDepth() { mDeferredPass->switchToDepthPipeline(); }
+void VulkanRendererForEditor::switchToDepth() { mCompositePass->switchToDepthPipeline(); }
 
 } // namespace svulkan

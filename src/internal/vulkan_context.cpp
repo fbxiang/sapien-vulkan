@@ -222,6 +222,22 @@ void VulkanContext::initializeDescriptorSetLayouts() {
                                                  {vk::DescriptorType::eCombinedImageSampler, 1,
                                                   vk::ShaderStageFlagBits::eFragment} // depth
                                              });
+
+  mDescriptorSetLayouts.composite =
+      createDescriptorSetLayout(getDevice(), {
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // lighting
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // albedo
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // position
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // specular
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // normal
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment} // depth
+                                             });
 }
 
 std::shared_ptr<VulkanTextureData> VulkanContext::getPlaceholderTexture() {

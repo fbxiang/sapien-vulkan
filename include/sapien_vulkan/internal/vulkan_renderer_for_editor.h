@@ -21,6 +21,7 @@ class VulkanRendererForEditor {
     std::unique_ptr<VulkanImageData> depth;
 
     std::unique_ptr<VulkanImageData> lighting;
+    std::unique_ptr<VulkanImageData> lighting2;  // ping pong buffer for lighting
   } mRenderTargets;
 
   struct RenderTargetFormats {
@@ -33,9 +34,13 @@ class VulkanRendererForEditor {
   std::unique_ptr<class DeferredPass> mDeferredPass;
   std::unique_ptr<class AxisPass> mAxisPass;
   std::unique_ptr<class TransparencyPass> mTransparencyPass;
+  std::unique_ptr<class CompositePass> mCompositePass;
 
   vk::UniqueDescriptorSet mDeferredDescriptorSet;
   vk::UniqueSampler mDeferredSampler;
+
+  vk::UniqueDescriptorSet mCompositeDescriptorSet;
+  vk::UniqueSampler mCompositeSampler;
 
 public:
   VulkanRendererForEditor(VulkanContext &context, VulkanRendererConfig const &config);

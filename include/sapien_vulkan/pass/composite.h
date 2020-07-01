@@ -4,14 +4,17 @@
 namespace svulkan {
 class VulkanContext;
 
-class DeferredPass {
+class CompositePass {
 
   VulkanContext *mContext;
   vk::UniqueRenderPass mRenderPass;
   vk::UniquePipelineLayout mPipelineLayout;
 
-  vk::UniquePipeline mPipeline;
+  vk::Pipeline mPipeline;
 
+  vk::UniquePipeline mPipelineLighting;
+  vk::UniquePipeline mPipelineNormal;
+  vk::UniquePipeline mPipelineDepth;
   vk::UniqueFramebuffer mFramebuffer;
 
   std::string mShaderDir;
@@ -19,13 +22,13 @@ class DeferredPass {
   std::vector<vk::Format> mOutputFormats;
 
 public:
-  DeferredPass(VulkanContext &context);
+  CompositePass(VulkanContext &context);
 
-  DeferredPass(DeferredPass const &other) = delete;
-  DeferredPass &operator=(DeferredPass const &other) = delete;
+  CompositePass(CompositePass const &other) = delete;
+  CompositePass &operator=(CompositePass const &other) = delete;
 
-  DeferredPass(DeferredPass &&other) = default;
-  DeferredPass &operator=(DeferredPass &&other) = default;
+  CompositePass(CompositePass &&other) = default;
+  CompositePass &operator=(CompositePass &&other) = default;
 
   void initializePipeline(std::string shaderDir,
                           std::vector<vk::DescriptorSetLayout> const &layouts,
@@ -37,7 +40,11 @@ public:
   inline vk::Framebuffer getFramebuffer() { return mFramebuffer.get(); }
   inline vk::RenderPass getRenderPass() { return mRenderPass.get(); }
   inline vk::PipelineLayout getPipelineLayout() { return mPipelineLayout.get(); }
-  inline vk::Pipeline getPipeline() { return mPipeline.get(); }
+  inline vk::Pipeline getPipeline() { return mPipeline; }
+
+  void switchToNormalPipeline();
+  void switchToLightingPipeline();
+  void switchToDepthPipeline();
 };
 
 } // namespace svulkan

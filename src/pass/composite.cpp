@@ -1,4 +1,4 @@
-#include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/pass/composite.h"
 #include "sapien_vulkan/internal/vulkan_context.h"
 #include "sapien_vulkan/uniform_buffers.h"
 
@@ -31,26 +31,18 @@ static vk::UniquePipeline createGraphicsPipeline(
     std::string const &shaderDir,
     vk::Device device, uint32_t numColorAttachments,
     vk::PipelineLayout pipelineLayout,
-    vk::RenderPass renderPass) {
+    vk::RenderPass renderPass, std::string const &fragmentShaderFile) {
   vk::UniquePipelineCache pipelineCache = device.createPipelineCacheUnique({});
 
-  auto vsm = createShaderModule(device, shaderDir + "/deferred.vert.spv");
-  auto fsm = createShaderModule(device, shaderDir + "/deferred.frag.spv");
-
-  // TODO: clean up light count handling
-  std::vector<vk::SpecializationMapEntry> entries = { vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),
-    vk::SpecializationMapEntry(1, sizeof(uint32_t), sizeof(uint32_t)) };
-  std::vector<uint32_t> data = { NumDirectionalLights, NumPointLights };
-  vk::SpecializationInfo specializationInfo(static_cast<uint32_t>(entries.size()), entries.data(),
-                                            2 * sizeof(uint32_t), data.data());
+  auto vsm = createShaderModule(device, shaderDir + "/composite.vert.spv");
+  auto fsm = createShaderModule(device, shaderDir + "/" + fragmentShaderFile);
 
   vk::PipelineShaderStageCreateInfo pipelineShaderStageCreateInfos[2] = {
     vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(), vk::ShaderStageFlagBits::eVertex,
                                       vsm.get(), "main", nullptr),
     vk::PipelineShaderStageCreateInfo(vk::PipelineShaderStageCreateFlags(),
-                                      vk::ShaderStageFlagBits::eFragment, fsm.get(), "main",
-                                      &specializationInfo)};
-
+                                      vk::ShaderStageFlagBits::eFragment, fsm.get(), "main")};
+  
   std::vector<vk::VertexInputAttributeDescription> vertexInputAttributeDescriptions;
   vk::PipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo;
 
@@ -100,9 +92,9 @@ static vk::UniquePipeline createGraphicsPipeline(
   return device.createGraphicsPipelineUnique(pipelineCache.get(), graphicsPipelineCreateInfo);
 }
 
-DeferredPass::DeferredPass(VulkanContext &context): mContext(&context) {}
+CompositePass::CompositePass(VulkanContext &context): mContext(&context) {}
 
-void DeferredPass::initializePipeline(
+void CompositePass::initializePipeline(
     std::string shaderDir,
     std::vector<vk::DescriptorSetLayout> const &layouts,
     std::vector<vk::Format> const &outputFormats) {
@@ -110,20 +102,38 @@ void DeferredPass::initializePipeline(
   mOutputFormats = outputFormats;
   mLayouts = layouts;
 
-  // contains information about what buffers 
   mPipelineLayout = mContext->getDevice().createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo(
       vk::PipelineLayoutCreateFlags(), layouts.size(), layouts.data()));
 
   mRenderPass = createRenderPass(mContext->getDevice(), outputFormats);
 
-  mPipeline = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
-                                     mPipelineLayout.get(), mRenderPass.get());
+  mPipelineLighting = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                     mPipelineLayout.get(), mRenderPass.get(), "composite.frag.spv");
+
+  mPipelineNormal = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                     mPipelineLayout.get(), mRenderPass.get(), "composite_normal.frag.spv");
+
+  mPipelineDepth = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                     mPipelineLayout.get(), mRenderPass.get(), "composite_depth.frag.spv");
+  mPipeline = mPipelineLighting.get();
 }
 
-void DeferredPass::initializeFramebuffer(std::vector<vk::ImageView> const& outputImageViews,
+void CompositePass::initializeFramebuffer(std::vector<vk::ImageView> const& outputImageViews,
                                         vk::Extent2D const &extent) {
   mFramebuffer = createFramebuffer(
       mContext->getDevice(), mRenderPass.get(), outputImageViews, {}, extent);
+}
+
+void CompositePass::switchToNormalPipeline() {
+  mPipeline = mPipelineNormal.get();
+}
+
+void CompositePass::switchToLightingPipeline() {
+  mPipeline = mPipelineLighting.get();
+}
+
+void CompositePass::switchToDepthPipeline() {
+  mPipeline = mPipelineDepth.get();
 }
 
 }
