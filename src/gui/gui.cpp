@@ -26,10 +26,6 @@ void VulkanWindow::newFrame() {
   }
   mFrameIndex = result.value;
 
-  if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_A) + 'q' - 'a')) {
-    log::info("q pressed");
-  }
-
   auto mousePos = ImGui::GetMousePos();
 
   static bool firstFrame = true;
@@ -79,7 +75,11 @@ ImVec2 VulkanWindow::getMousePosition() {
 }
 
 bool VulkanWindow::isMouseKeyDown(int key) {
-  return ImGui::IsMouseDown(key);
+  return !ImGui::GetIO().WantCaptureMouse && ImGui::IsMouseDown(key);
+}
+
+bool VulkanWindow::isMouseKeyClicked(int key) {
+  return !ImGui::GetIO().WantCaptureMouse && ImGui::IsMouseClicked(key);
 }
 
 bool VulkanWindow::presentFrameWithImgui(vk::Queue graphicsQueue, vk::Queue presentQueue,

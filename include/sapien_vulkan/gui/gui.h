@@ -82,7 +82,7 @@ class VulkanWindow {
   bool isKeyDown(char key); 
 
   bool isKeyPressed(char key); 
-  
+
   ImVec2 getMouseDelta(); 
 
   ImVec2 getMouseWheelDelta(); 
@@ -90,6 +90,8 @@ class VulkanWindow {
   ImVec2 getMousePosition();
 
   bool isMouseKeyDown(int key); 
+
+  bool isMouseKeyClicked(int key); 
 
   bool presentFrameWithImgui(vk::Queue graphicsQueue, vk::Queue presentQueue,
                              vk::Semaphore renderCompleteSemaphore, vk::Fence frameCompleteFence); 
