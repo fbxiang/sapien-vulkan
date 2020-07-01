@@ -236,6 +236,8 @@ void VulkanContext::initializeDescriptorSetLayouts() {
                                                  {vk::DescriptorType::eCombinedImageSampler, 1,
                                                   vk::ShaderStageFlagBits::eFragment}, // normal
                                                  {vk::DescriptorType::eCombinedImageSampler, 1,
+                                                  vk::ShaderStageFlagBits::eFragment}, // segmentation
+                                                 {vk::DescriptorType::eCombinedImageSampler, 1,
                                                   vk::ShaderStageFlagBits::eFragment} // depth
                                              });
 }

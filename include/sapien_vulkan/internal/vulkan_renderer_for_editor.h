@@ -58,6 +58,7 @@ public:
   void switchToLighting();
   void switchToNormal();
   void switchToDepth();
+  void switchToSegmentation();
 
   void render(vk::CommandBuffer commandBuffer, class Scene &scene, class Camera &camera);
   /* blit image to screen */

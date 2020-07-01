@@ -15,6 +15,7 @@ class CompositePass {
   vk::UniquePipeline mPipelineLighting;
   vk::UniquePipeline mPipelineNormal;
   vk::UniquePipeline mPipelineDepth;
+  vk::UniquePipeline mPipelineSegmentation;
   vk::UniqueFramebuffer mFramebuffer;
 
   std::string mShaderDir;
@@ -45,6 +46,7 @@ public:
   void switchToNormalPipeline();
   void switchToLightingPipeline();
   void switchToDepthPipeline();
+  void switchToSegmentationPipeline();
 };
 
 } // namespace svulkan

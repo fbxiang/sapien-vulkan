@@ -205,6 +205,8 @@ void VulkanRendererForEditor::initializeRenderTextures() {
                               vk::ImageLayout::eShaderReadOnlyOptimal),
       vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.normal->mImageView.get(),
                               vk::ImageLayout::eShaderReadOnlyOptimal),
+      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.segmentation->mImageView.get(),
+                              vk::ImageLayout::eShaderReadOnlyOptimal),
       vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.depth->mImageView.get(),
                               vk::ImageLayout::eShaderReadOnlyOptimal)};
   writeDescriptorSets = {vk::WriteDescriptorSet(
@@ -524,7 +526,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     // transition to texture formats
     for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
                      mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
-                     mRenderTargets.normal->mImage.get()}) {
+                     mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
       transitionImageLayout(
           commandBuffer, img, mRenderTargetFormats.colorFormat,
           vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -562,7 +564,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     // transition textures back to gbuffer formats
     for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
         mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
-        mRenderTargets.normal->mImage.get()}) {
+        mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
       transitionImageLayout(
           commandBuffer, img, mRenderTargetFormats.colorFormat,
           vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
@@ -711,5 +713,7 @@ void VulkanRendererForEditor::switchToLighting() { mCompositePass->switchToLight
 void VulkanRendererForEditor::switchToNormal() { mCompositePass->switchToNormalPipeline(); }
 
 void VulkanRendererForEditor::switchToDepth() { mCompositePass->switchToDepthPipeline(); }
+
+void VulkanRendererForEditor::switchToSegmentation() { mCompositePass->switchToSegmentationPipeline(); }
 
 } // namespace svulkan
