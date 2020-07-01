@@ -5,6 +5,7 @@
 #include "sapien_vulkan/pass/axis.h"
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/transparency.h"
 #include "sapien_vulkan/scene.h"
 
 namespace svulkan {
@@ -15,6 +16,7 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
   mGBufferPass = std::make_unique<GBufferPass>(context);
   mDeferredPass = std::make_unique<DeferredPass>(context);
   mAxisPass = std::make_unique<AxisPass>(context);
+  mTransparencyPass = std::make_unique<TransparencyPass>(context);
 
   mDeferredDescriptorSet =
       std::move(mContext->getDevice()
@@ -217,11 +219,32 @@ void VulkanRendererForEditor::initializeRenderPasses() {
 
   // initialize axis pass
   {
-    mAxisPass->initializePipeline(
-        shaderDir, {l.object.get(), l.camera.get()}, {mRenderTargetFormats.colorFormat},
-        mRenderTargetFormats.depthFormat, cullMode, vk::FrontFace::eCounterClockwise, getMaxAxes());
+    mAxisPass->initializePipeline(shaderDir, {l.object.get(), l.camera.get()},
+                                  {mRenderTargetFormats.colorFormat},
+                                  mRenderTargetFormats.depthFormat, cullMode,
+                                  vk::FrontFace::eCounterClockwise, getMaxAxes());
     mAxisPass->initializeFramebuffer(
         {mRenderTargets.lighting->mImageView.get()}, mRenderTargets.depth->mImageView.get(),
+        {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
+  }
+
+  // initialize transparency pass
+  {
+    std::vector<vk::DescriptorSetLayout> layouts = {l.scene.get(), l.camera.get(), l.object.get(),
+                                                    l.material.get()};
+    std::vector<vk::Format> colorFormats = {
+        mRenderTargetFormats.colorFormat, mRenderTargetFormats.colorFormat,
+        mRenderTargetFormats.colorFormat, mRenderTargetFormats.colorFormat,
+        mRenderTargetFormats.colorFormat, mRenderTargetFormats.segmentationFormat};
+
+    mTransparencyPass->initializePipeline(shaderDir, layouts, colorFormats,
+                                          mRenderTargetFormats.depthFormat, cullMode,
+                                          vk::FrontFace::eCounterClockwise);
+    mTransparencyPass->initializeFramebuffer(
+        {mRenderTargets.lighting->mImageView.get(), mRenderTargets.albedo->mImageView.get(),
+         mRenderTargets.position->mImageView.get(), mRenderTargets.specular->mImageView.get(),
+         mRenderTargets.normal->mImageView.get(), mRenderTargets.segmentation->mImageView.get()},
+        mRenderTargets.depth->mImageView.get(),
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
   }
 }
@@ -231,6 +254,9 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   // sync object data to GPU
   scene.prepareObjectsForRender();
   for (auto obj : scene.getOpaqueObjects()) {
+    obj->updateVulkanObject();
+  }
+  for (auto obj : scene.getTransparentObjects()) {
     obj->updateVulkanObject();
   }
 
@@ -392,6 +418,50 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
         std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxes()), 0, 0, 0);
     commandBuffer.endRenderPass();
   }
+
+  // transparency pass
+  if (scene.getTransparentObjects().size()) {
+    std::vector<vk::ClearValue> clearValues;
+    clearValues.resize(7);
+    vk::RenderPassBeginInfo renderPassBeginInfo {
+        mTransparencyPass->getRenderPass(), mTransparencyPass->getFramebuffer(),
+        vk::Rect2D({0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}),
+        static_cast<uint32_t>(clearValues.size()), clearValues.data()};
+
+    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mTransparencyPass->getPipeline());
+    commandBuffer.setViewport(
+        0, {{0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}});
+    commandBuffer.setScissor(
+        0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
+
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                     mTransparencyPass->getPipelineLayout(), 0,
+                                     scene.getVulkanScene()->getDescriptorSet(), nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                     mTransparencyPass->getPipelineLayout(), 1,
+                                     camera.mDescriptorSet.get(), nullptr);
+    for (auto &obj : scene.getTransparentObjects()) {
+      auto vobj = obj->getVulkanObject();
+      if (vobj) {
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         mTransparencyPass->getPipelineLayout(), 2,
+                                         vobj->mDescriptorSet.get(), nullptr);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         mTransparencyPass->getPipelineLayout(), 3,
+                                         vobj->mMaterial->getDescriptorSet(), nullptr);
+        commandBuffer.pushConstants<float>(mTransparencyPass->getPipelineLayout(),
+                                           vk::ShaderStageFlagBits::eFragment,
+                                           0, obj->mVisibility);
+
+        commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
+        commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0,
+                                      vk::IndexType::eUint32);
+        commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);
+      }
+    }
+    commandBuffer.endRenderPass();
+  }
 }
 
 void VulkanRendererForEditor::display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage,
@@ -516,18 +586,10 @@ void VulkanRendererForEditor::updateAxisUBO() {
   }
 }
 
+void VulkanRendererForEditor::switchToLighting() { mDeferredPass->switchToLightingPipeline(); }
 
-void VulkanRendererForEditor::switchToLighting() {
-  mDeferredPass->switchToLightingPipeline();
-}
+void VulkanRendererForEditor::switchToNormal() { mDeferredPass->switchToNormalPipeline(); }
 
-void VulkanRendererForEditor::switchToNormal() {
-  mDeferredPass->switchToNormalPipeline();
-}
-
-void VulkanRendererForEditor::switchToDepth() {
-  mDeferredPass->switchToDepthPipeline();
-}
-
+void VulkanRendererForEditor::switchToDepth() { mDeferredPass->switchToDepthPipeline(); }
 
 } // namespace svulkan

@@ -124,6 +124,11 @@ void VulkanContext::createInstance() {
 
 void VulkanContext::pickPhysicalDevice() {
   mPhysicalDevice = mInstance->enumeratePhysicalDevices().front();
+  auto features = mPhysicalDevice.getFeatures();
+  if (!features.independentBlend) {
+    log::critical("Failed to pick physical device: no independent blend support");
+    exit(1);
+  }
 }
 
 void VulkanContext::createLogicalDevice() {
@@ -142,6 +147,8 @@ void VulkanContext::createLogicalDevice() {
                                                   static_cast<uint32_t>(graphicsQueueFamilyIndex),
                                                   1, &queuePriority);
   std::vector<const char *> deviceExtensions{};
+  vk::PhysicalDeviceFeatures features;
+  features.independentBlend = true;
 
 #ifdef ON_SCREEN
   if (mRequirePresent) {
@@ -150,7 +157,7 @@ void VulkanContext::createLogicalDevice() {
 #endif
   mDevice = mPhysicalDevice.createDeviceUnique(
       vk::DeviceCreateInfo(vk::DeviceCreateFlags(), 1, &deviceQueueCreateInfo, 0, nullptr,
-                           deviceExtensions.size(), deviceExtensions.data()));
+                           deviceExtensions.size(), deviceExtensions.data(), &features));
 }
 
 vk::Queue VulkanContext::getGraphicsQueue() const {

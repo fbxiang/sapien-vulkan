@@ -32,6 +32,7 @@ class VulkanRenderer {
 
   std::unique_ptr<class GBufferPass> mGBufferPass;
   std::unique_ptr<class DeferredPass> mDeferredPass;
+  std::unique_ptr<class TransparencyPass> mTransparencyPass;
   vk::UniqueDescriptorSet mDeferredDescriptorSet;
   vk::UniqueSampler mDeferredSampler;
 

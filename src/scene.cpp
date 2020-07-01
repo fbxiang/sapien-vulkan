@@ -73,7 +73,7 @@ static void prepareObjectTree(Object *obj, const glm::mat4 &parentModelMat,
                               std::vector<Object *> &opaque, std::vector<Object *> &transparent) {
   obj->mGlobalModelMatrixCache = parentModelMat * obj->getModelMat();
   if (obj->getVulkanObject() && obj->mVisibility > 0.f) {
-    if (obj->mVisibility < 1.f) {
+    if (obj->mVisibility < 1.f || obj->getMaterial()->getProperties().additionalTransparency > 0.f) {
       transparent.push_back(obj);
     } else {
       opaque.push_back(obj);

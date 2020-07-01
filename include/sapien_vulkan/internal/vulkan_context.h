@@ -4,6 +4,7 @@
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
 #include "sapien_vulkan/pass/axis.h"
+#include "sapien_vulkan/pass/transparency.h"
 #include "vulkan_renderer_config.h"
 #include <vulkan/vulkan.hpp>
 

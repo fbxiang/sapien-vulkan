@@ -25,7 +25,7 @@ class Object
 
  public:
   std::string mName = "";
-  float mVisibility = 1.f;
+  float mVisibility = 1.f;  // this visibility should only be used in editor rendering
   Transform mTransform = {};
 
   Object(std::unique_ptr<VulkanObject> vulkanObject);
@@ -61,6 +61,7 @@ class Object
   inline uint32_t getSegmentId() { return mSegmentId; }
 
   void updateMaterial(PBRMaterialUBO material);
+  inline std::shared_ptr<VulkanMaterial> getMaterial() { return mVulkanObject->mMaterial; }
 };
 
 }

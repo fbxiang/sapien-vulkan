@@ -18,6 +18,7 @@ VulkanMaterial::VulkanMaterial(vk::PhysicalDevice physicalDevice, vk::Device dev
 }
 
 void VulkanMaterial::setProperties(PBRMaterialUBO const &data) {
+  mMaterial = data;
   copyToDevice<PBRMaterialUBO>(mDevice, mUBO.mMemory.get(), data);
 }
 
