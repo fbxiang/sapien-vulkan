@@ -365,7 +365,6 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
   }
 }
 
-
 void VulkanRenderer::display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage, vk::Format swapchainFormat, uint32_t width, uint32_t height) {
   auto & img = mRenderTargets.lighting;
 
