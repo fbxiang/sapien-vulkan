@@ -50,14 +50,26 @@ bool VulkanWindow::isKeyDown(char key) {
   if (ImGui::GetIO().WantTextInput || ImGui::GetIO().WantCaptureKeyboard) {
     return false;
   }
-  return ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
+  if (key >= 'a' && key <= 'z') {
+    return ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
+  }
+  if (key == ' ') {
+    return ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Space));
+  }
+  return false;
 }
 
 bool VulkanWindow::isKeyPressed(char key) {
   if (ImGui::GetIO().WantTextInput || ImGui::GetIO().WantCaptureKeyboard) {
     return false;
   }
-  return ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
+  if (key >= 'a' && key <= 'z') {
+    return ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_A) + key - 'a');
+  }
+  if (key == ' ') {
+    return ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Space));
+  }
+  return false;
 }
 
 ImVec2 VulkanWindow::getMouseDelta() {
