@@ -22,12 +22,25 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device,
   vk::SubpassDescription subpassDescription{
       {},      vk::PipelineBindPoint::eGraphics,          0,
       nullptr, static_cast<uint32_t>(attachments.size()), attachments.data()};
+
+  std::array<vk::SubpassDependency, 1> dependencies;
+  dependencies[0].srcSubpass = 0;
+  dependencies[0].dstSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
+  dependencies[0].srcAccessMask =
+      vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[0].dstAccessMask = vk::AccessFlagBits::eMemoryRead;
+  dependencies[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+
   return device.createRenderPassUnique(
       vk::RenderPassCreateInfo{{},
                                static_cast<uint32_t>(attachmentDescriptions.size()),
                                attachmentDescriptions.data(),
                                1,
-                               &subpassDescription});
+                               &subpassDescription,
+                               dependencies.size(),
+                               dependencies.data()});
 }
 
 static vk::UniquePipeline createGraphicsPipeline(std::string const &shaderDir, vk::Device device,

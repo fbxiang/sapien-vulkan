@@ -13,13 +13,13 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device, std::vector<vk::
     attachmentDescriptions.push_back(vk::AttachmentDescription(
         vk::AttachmentDescriptionFlags(), colorFormat, vk::SampleCountFlagBits::e1, loadOp,
         vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-        vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal));
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal));
   }
   assert(depthFormat != vk::Format::eUndefined);
   attachmentDescriptions.push_back(vk::AttachmentDescription(
       vk::AttachmentDescriptionFlags(), depthFormat, vk::SampleCountFlagBits::e1, loadOp,
       vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal));
+      vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal));
 
   std::vector<vk::AttachmentReference> colorAttachments;
   for (uint32_t i = 0; i < colorFormats.size(); ++i) {
@@ -30,9 +30,29 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device, std::vector<vk::
   vk::SubpassDescription subpassDescription(
       vk::SubpassDescriptionFlags(), vk::PipelineBindPoint::eGraphics,
       0, nullptr, colorAttachments.size(), colorAttachments.data(), nullptr, &depthAttachment);
+
+  std::array<vk::SubpassDependency, 2> dependencies;
+  dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[0].dstSubpass = 0;
+  dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
+  dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[0].srcAccessMask = vk::AccessFlagBits::eMemoryRead;
+  dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                                  vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+
+  dependencies[1].srcSubpass = 0;
+  dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader;
+  dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                                  vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[1].dstAccessMask = vk::AccessFlagBits::eShaderRead;
+  dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+
   return device.createRenderPassUnique(
       vk::RenderPassCreateInfo({}, attachmentDescriptions.size(), attachmentDescriptions.data(),
-                               1, &subpassDescription));
+                               1, &subpassDescription, dependencies.size(), dependencies.data()));
 }
 
 static vk::UniquePipeline createGraphicsPipeline(std::string const &shaderDir,

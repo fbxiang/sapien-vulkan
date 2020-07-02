@@ -378,22 +378,22 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   // render deferred pass
   {
     // transition to texture formats
-    for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-                     mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
-      transitionImageLayout(
-          commandBuffer, img, mRenderTargetFormats.colorFormat,
-          vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-          vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
-          vk::PipelineStageFlagBits::eColorAttachmentOutput,
-          vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eColor);
-    }
-    transitionImageLayout(
-        commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-        vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::AccessFlagBits::eDepthStencilAttachmentWrite, vk::AccessFlagBits::eShaderRead,
-        vk::PipelineStageFlagBits::eEarlyFragmentTests |
-            vk::PipelineStageFlagBits::eLateFragmentTests,
-        vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eDepth);
+    // for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
+    //                  mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
+    //   transitionImageLayout(
+    //       commandBuffer, img, mRenderTargetFormats.colorFormat,
+    //       vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+    //       vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
+    //       vk::PipelineStageFlagBits::eColorAttachmentOutput,
+    //       vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eColor);
+    // }
+    // transitionImageLayout(
+    //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+    //     vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+    //     vk::AccessFlagBits::eDepthStencilAttachmentWrite, vk::AccessFlagBits::eShaderRead,
+    //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
+    //         vk::PipelineStageFlagBits::eLateFragmentTests,
+    //     vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eDepth);
 
     // draw quad
     std::vector<vk::ClearValue> clearValues = {
@@ -422,26 +422,26 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     commandBuffer.endRenderPass();
 
     // transition textures back to gbuffer formats
-    for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-                     mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
-      transitionImageLayout(
-          commandBuffer, img, mRenderTargetFormats.colorFormat,
-          vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
-          vk::AccessFlagBits::eShaderRead,
-          vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-          vk::PipelineStageFlagBits::eFragmentShader,
-          vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
-    }
-    transitionImageLayout(
-        commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        vk::AccessFlagBits::eShaderRead,
-        vk::AccessFlagBits::eDepthStencilAttachmentRead |
-            vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-        vk::PipelineStageFlagBits::eFragmentShader,
-        vk::PipelineStageFlagBits::eEarlyFragmentTests |
-            vk::PipelineStageFlagBits::eLateFragmentTests,
-        vk::ImageAspectFlagBits::eDepth);
+    // for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
+    //                  mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
+    //   transitionImageLayout(
+    //       commandBuffer, img, mRenderTargetFormats.colorFormat,
+    //       vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
+    //       vk::AccessFlagBits::eShaderRead,
+    //       vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+    //       vk::PipelineStageFlagBits::eFragmentShader,
+    //       vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+    // }
+    // transitionImageLayout(
+    //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+    //     vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    //     vk::AccessFlagBits::eShaderRead,
+    //     vk::AccessFlagBits::eDepthStencilAttachmentRead |
+    //         vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+    //     vk::PipelineStageFlagBits::eFragmentShader,
+    //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
+    //         vk::PipelineStageFlagBits::eLateFragmentTests,
+    //     vk::ImageAspectFlagBits::eDepth);
   }
 
   // axis pass
@@ -478,7 +478,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   }
 
   // transparency pass
-  if (scene.getTransparentObjects().size()) {
+  // if (scene.getTransparentObjects().size()) {
     std::vector<vk::ClearValue> clearValues;
     clearValues.resize(7);
     vk::RenderPassBeginInfo renderPassBeginInfo{
@@ -519,7 +519,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
       }
     }
     commandBuffer.endRenderPass();
-  }
+  // }
 
   // composite pass
   {
@@ -542,6 +542,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
             vk::PipelineStageFlagBits::eLateFragmentTests,
         vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eDepth);
 
+
     std::vector<vk::ClearValue> clearValues = {
         vk::ClearColorValue{std::array{0.f, 0.f, 0.f, 1.f}}};
     vk::RenderPassBeginInfo renderPassBeginInfo{
@@ -562,27 +563,27 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     commandBuffer.endRenderPass();
 
     // transition textures back to gbuffer formats
-    for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
-        mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
-        mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
-      transitionImageLayout(
-          commandBuffer, img, mRenderTargetFormats.colorFormat,
-          vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
-          vk::AccessFlagBits::eShaderRead,
-          vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-          vk::PipelineStageFlagBits::eFragmentShader,
-          vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
-    }
-    transitionImageLayout(
-        commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        vk::AccessFlagBits::eShaderRead,
-        vk::AccessFlagBits::eDepthStencilAttachmentRead |
-            vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-        vk::PipelineStageFlagBits::eFragmentShader,
-        vk::PipelineStageFlagBits::eEarlyFragmentTests |
-            vk::PipelineStageFlagBits::eLateFragmentTests,
-        vk::ImageAspectFlagBits::eDepth);
+    // for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
+    //     mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
+    //     mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
+    //   transitionImageLayout(
+    //       commandBuffer, img, mRenderTargetFormats.colorFormat,
+    //       vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
+    //       vk::AccessFlagBits::eShaderRead,
+    //       vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+    //       vk::PipelineStageFlagBits::eFragmentShader,
+    //       vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+    // }
+    // transitionImageLayout(
+    //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+    //     vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    //     vk::AccessFlagBits::eShaderRead,
+    //     vk::AccessFlagBits::eDepthStencilAttachmentRead |
+    //         vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+    //     vk::PipelineStageFlagBits::eFragmentShader,
+    //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
+    //         vk::PipelineStageFlagBits::eLateFragmentTests,
+    //     vk::ImageAspectFlagBits::eDepth);
   }
 }
 

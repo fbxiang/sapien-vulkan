@@ -244,15 +244,15 @@ int main() {
       cameraController.move(0, -r, 0);
     }
 
-    if (count == 1000) {
-      renderer->switchToNormal();
-    }
-    if (count == 2000) {
-      renderer->switchToDepth();
-    }
-    if (count == 3000) {
-      renderer->switchToDepth();
-    }
+    // if (count == 1000) {
+    //   renderer->switchToNormal();
+    // }
+    // if (count == 2000) {
+    //   renderer->switchToDepth();
+    // }
+    // if (count == 3000) {
+    //   renderer->switchToDepth();
+    // }
   }
   device.waitIdle();
 

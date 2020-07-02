@@ -22,9 +22,31 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device, std::vector<vk::
     {}, vk::PipelineBindPoint::eGraphics, 0, nullptr,
     static_cast<uint32_t>(attachments.size()), attachments.data()
   };
+
+  std::array<vk::SubpassDependency, 2> dependencies;
+  dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[0].dstSubpass = 0;
+  dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[0].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[0].srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                                  vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                                  vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+
+  dependencies[1].srcSubpass = 0;
+  dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+  dependencies[1].srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependencies[1].srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                                  vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[1].dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                                  vk::AccessFlagBits::eColorAttachmentWrite;
+  dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
+
   return device.createRenderPassUnique(vk::RenderPassCreateInfo{
       {}, static_cast<uint32_t>(attachmentDescriptions.size()), attachmentDescriptions.data(),
-      1, &subpassDescription});
+      1, &subpassDescription, dependencies.size(), dependencies.data()});
 }
 
 static vk::UniquePipeline createGraphicsPipeline(
@@ -96,7 +118,7 @@ static vk::UniquePipeline createGraphicsPipeline(
       &pipelineRasterizationStateCreateInfo, &pipelineMultisampleStateCreateInfo,
       &pipelineDepthStencilStateCreateInfo, &pipelineColorBlendStateCreateInfo,
       &pipelineDynamicStateCreateInfo, pipelineLayout, renderPass);
-  
+
   return device.createGraphicsPipelineUnique(pipelineCache.get(), graphicsPipelineCreateInfo);
 }
 

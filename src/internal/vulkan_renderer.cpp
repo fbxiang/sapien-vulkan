@@ -295,27 +295,6 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
 
   // render deferred pass
   {
-    // transition to texture formats
-    for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-        mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
-      transitionImageLayout(commandBuffer, img, mRenderTargetFormats.colorFormat,
-                            vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-                            vk::AccessFlagBits::eColorAttachmentWrite,
-                            vk::AccessFlagBits::eShaderRead,
-                            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            vk::PipelineStageFlagBits::eFragmentShader,
-                            vk::ImageAspectFlagBits::eColor);
-    }
-    transitionImageLayout(commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-                          vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                          vk::ImageLayout::eShaderReadOnlyOptimal,
-                          vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-                          vk::AccessFlagBits::eShaderRead,
-                          vk::PipelineStageFlagBits::eEarlyFragmentTests |
-                          vk::PipelineStageFlagBits::eLateFragmentTests,
-                          vk::PipelineStageFlagBits::eFragmentShader,
-                          vk::ImageAspectFlagBits::eDepth);
-
     // draw quad
     std::vector<vk::ClearValue> clearValues = { vk::ClearColorValue{std::array{0.f,0.f,0.f,1.f}} };
     vk::RenderPassBeginInfo renderPassBeginInfo {
@@ -338,28 +317,6 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
 
     commandBuffer.draw(3, 1, 0, 0);
     commandBuffer.endRenderPass();
-
-    // transition textures back to gbuffer formats
-    for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-        mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
-      transitionImageLayout(commandBuffer, img, mRenderTargetFormats.colorFormat,
-                            vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
-                            vk::AccessFlagBits::eShaderRead,
-                            vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-                            vk::PipelineStageFlagBits::eFragmentShader,
-                            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                            vk::ImageAspectFlagBits::eColor);
-    }
-    transitionImageLayout(commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-                          vk::ImageLayout::eShaderReadOnlyOptimal,
-                          vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                          vk::AccessFlagBits::eShaderRead,
-                          vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                          vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-                          vk::PipelineStageFlagBits::eFragmentShader,
-                          vk::PipelineStageFlagBits::eEarlyFragmentTests |
-                          vk::PipelineStageFlagBits::eLateFragmentTests,
-                          vk::ImageAspectFlagBits::eDepth);
   }
 
   // transparency pass
@@ -406,7 +363,6 @@ void VulkanRenderer::render(vk::CommandBuffer commandBuffer, Scene &scene, Camer
     }
     commandBuffer.endRenderPass();
   }
-
 }
 
 
