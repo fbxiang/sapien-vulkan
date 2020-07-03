@@ -9,18 +9,24 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device, std::vector<vk::
                                              vk::Format depthFormat,
                                              vk::AttachmentLoadOp loadOp = vk::AttachmentLoadOp::eDontCare) {
   std::vector<vk::AttachmentDescription> attachmentDescriptions;
-  for (vk::Format colorFormat : colorFormats) {
-    assert(colorFormat != vk::Format::eUndefined);
+
+  for (uint32_t i = 0; i < colorFormats.size(); ++i) {
+    assert(colorFormats[i] != vk::Format::eUndefined);
     attachmentDescriptions.push_back(vk::AttachmentDescription(
-        vk::AttachmentDescriptionFlags(), colorFormat, vk::SampleCountFlagBits::e1, loadOp,
-        vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-        vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal));
+        vk::AttachmentDescriptionFlags(), colorFormats[i], vk::SampleCountFlagBits::e1, loadOp,
+        vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
+        vk::AttachmentStoreOp::eDontCare,
+        // lighting attachment is currently an attachment, the others are currently input textures
+        i == 0 ? vk::ImageLayout::eColorAttachmentOptimal : vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::ImageLayout::eColorAttachmentOptimal));
   }
+
   assert(depthFormat != vk::Format::eUndefined);
   attachmentDescriptions.push_back(vk::AttachmentDescription(
       vk::AttachmentDescriptionFlags(), depthFormat, vk::SampleCountFlagBits::e1, loadOp,
       vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal));
+      // depth was in the gbuffer texture
+      vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal));
 
   std::vector<vk::AttachmentReference> colorAttachments;
   for (uint32_t i = 0; i < colorFormats.size(); ++i) {

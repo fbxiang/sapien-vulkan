@@ -11,7 +11,7 @@ static vk::UniqueRenderPass createRenderPass(vk::Device device,
     assert(format != vk::Format::eUndefined);
     attachmentDescriptions.push_back(vk::AttachmentDescription(
         vk::AttachmentDescriptionFlags(), format, vk::SampleCountFlagBits::e1,
-        vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
+        vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eStore,
         vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
         vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal));
   }

@@ -13,15 +13,15 @@ createRenderPass(vk::Device device, std::vector<vk::Format> const &colorFormats,
     attachmentDescriptions.push_back(vk::AttachmentDescription(
         vk::AttachmentDescriptionFlags(), colorFormat, vk::SampleCountFlagBits::e1, loadOp,
         vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
-        vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
+        vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eColorAttachmentOptimal,
         vk::ImageLayout::eColorAttachmentOptimal));
   }
   assert(depthFormat != vk::Format::eUndefined);
   attachmentDescriptions.push_back(vk::AttachmentDescription(
       vk::AttachmentDescriptionFlags(), depthFormat, vk::SampleCountFlagBits::e1, loadOp,
       vk::AttachmentStoreOp::eStore, vk::AttachmentLoadOp::eDontCare,
-      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eDepthStencilAttachmentOptimal));
+      vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eShaderReadOnlyOptimal,
+      vk::ImageLayout::eShaderReadOnlyOptimal));
 
   std::vector<vk::AttachmentReference> colorAttachments;
   for (uint32_t i = 0; i < colorFormats.size(); ++i) {

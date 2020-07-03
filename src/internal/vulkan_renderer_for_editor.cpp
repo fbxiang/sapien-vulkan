@@ -563,27 +563,27 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     commandBuffer.endRenderPass();
 
     // transition textures back to gbuffer formats
-    // for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
-    //     mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
-    //     mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
-    //   transitionImageLayout(
-    //       commandBuffer, img, mRenderTargetFormats.colorFormat,
-    //       vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
-    //       vk::AccessFlagBits::eShaderRead,
-    //       vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-    //       vk::PipelineStageFlagBits::eFragmentShader,
-    //       vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
-    // }
-    // transitionImageLayout(
-    //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-    //     vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
-    //     vk::AccessFlagBits::eShaderRead,
-    //     vk::AccessFlagBits::eDepthStencilAttachmentRead |
-    //         vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-    //     vk::PipelineStageFlagBits::eFragmentShader,
-    //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
-    //         vk::PipelineStageFlagBits::eLateFragmentTests,
-    //     vk::ImageAspectFlagBits::eDepth);
+    for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
+        mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
+        mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
+      transitionImageLayout(
+          commandBuffer, img, mRenderTargetFormats.colorFormat,
+          vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
+          vk::AccessFlagBits::eShaderRead,
+          vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+          vk::PipelineStageFlagBits::eFragmentShader,
+          vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+    }
+    transitionImageLayout(
+        commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
+        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        vk::AccessFlagBits::eShaderRead,
+        vk::AccessFlagBits::eDepthStencilAttachmentRead |
+            vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::PipelineStageFlagBits::eEarlyFragmentTests |
+            vk::PipelineStageFlagBits::eLateFragmentTests,
+        vk::ImageAspectFlagBits::eDepth);
   }
 }
 
