@@ -96,6 +96,10 @@ int main() {
   renderer->addAxes(m);
   m[3][1] = 3;
   renderer->addAxes(m);
+  m[3][1] = 1;
+  renderer->addStick(m);
+  m[3][1] = 2;
+  renderer->addStick(m);
   auto scene = Scene(context.createVulkanScene());
   LoadCustom(context, scene);
   LoadSponza(context, scene);

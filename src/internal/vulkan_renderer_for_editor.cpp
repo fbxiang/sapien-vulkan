@@ -27,6 +27,7 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
                         &mContext->getDescriptorSetLayouts().deferred.get()))
                     .front());
   prepareAxesResources();
+  prepareStickResources();
   mCompositeDescriptorSet =
       std::move(mContext->getDevice()
                     .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
@@ -271,7 +272,7 @@ void VulkanRendererForEditor::initializeRenderPasses() {
     mAxisPass->initializePipeline(shaderDir, {l.object.get(), l.camera.get()},
                                   {mRenderTargetFormats.colorFormat},
                                   mRenderTargetFormats.depthFormat, cullMode,
-                                  vk::FrontFace::eCounterClockwise, getMaxAxes());
+                                  vk::FrontFace::eCounterClockwise, getMaxAxisPassInstances());
     mAxisPass->initializeFramebuffer(
         {mRenderTargets.lighting->mImageView.get()}, mRenderTargets.depth->mImageView.get(),
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
@@ -324,6 +325,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
 
   // sync axes transform
   updateAxisUBO();
+  updateStickUBO();
 
   // render gbuffer pass
   {
@@ -445,7 +447,7 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   }
 
   // axis pass
-  if (mAxesTransforms.size()) {
+  if (mAxesTransforms.size() || mStickTransforms.size()) {
     std::vector<vk::ClearValue> clearValues;
     clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f})); // albedo
     clearValues.push_back(vk::ClearDepthStencilValue(1.0f, 0));                           // depth
@@ -463,17 +465,29 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
         0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
 
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                     mAxisPass->getPipelineLayout(), 0, mAxesDescriptorSet.get(),
-                                     nullptr);
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                      mAxisPass->getPipelineLayout(), 1,
                                      camera.mDescriptorSet.get(), nullptr);
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                     mAxisPass->getPipelineLayout(), 0, mAxesDescriptorSet.get(),
+                                     nullptr);
     commandBuffer.bindVertexBuffers(0, mAxesMesh->mVertexBuffer->mBuffer.get(), {0});
     commandBuffer.bindIndexBuffer(mAxesMesh->mIndexBuffer->mBuffer.get(), 0,
                                   vk::IndexType::eUint32);
     commandBuffer.drawIndexed(
         mAxesMesh->mIndexCount,
-        std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxes()), 0, 0, 0);
+        std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxisPassInstances()), 0, 0, 0);
+
+
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                     mAxisPass->getPipelineLayout(), 0, mStickDescriptorSet.get(),
+                                     nullptr);
+    commandBuffer.bindVertexBuffers(0, mStickMesh->mVertexBuffer->mBuffer.get(), {0});
+    commandBuffer.bindIndexBuffer(mStickMesh->mIndexBuffer->mBuffer.get(), 0,
+                                  vk::IndexType::eUint32);
+    commandBuffer.drawIndexed(
+        mStickMesh->mIndexCount,
+        std::min(static_cast<uint32_t>(mStickTransforms.size()), getMaxAxisPassInstances()), 0, 0, 0);
+
     commandBuffer.endRenderPass();
   }
 
@@ -684,7 +698,7 @@ std::vector<uint32_t> VulkanRendererForEditor::downloadSegmentation() {
 
 void VulkanRendererForEditor::prepareAxesResources() {
   mAxesUBO = std::make_unique<VulkanBufferData>(
-      mContext->getPhysicalDevice(), mContext->getDevice(), getMaxAxes() * sizeof(glm::mat4),
+      mContext->getPhysicalDevice(), mContext->getDevice(), getMaxAxisPassInstances() * sizeof(glm::mat4),
       vk::BufferUsageFlagBits::eUniformBuffer);
 
   mAxesDescriptorSet = std::move(
@@ -702,10 +716,39 @@ void VulkanRendererForEditor::prepareAxesResources() {
                                            mContext->getGraphicsQueue(), vertices, indices, false);
 }
 
+
+void VulkanRendererForEditor::prepareStickResources() {
+  mStickUBO = std::make_unique<VulkanBufferData>(
+      mContext->getPhysicalDevice(), mContext->getDevice(), getMaxAxisPassInstances() * sizeof(glm::mat4),
+      vk::BufferUsageFlagBits::eUniformBuffer);
+
+  mStickDescriptorSet = std::move(
+      mContext->getDevice()
+          .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
+              mContext->getDescriptorPool(), 1, &mContext->getDescriptorSetLayouts().object.get()))
+          .front());
+  updateDescriptorSets(mContext->getDevice(), mStickDescriptorSet.get(),
+                       {{vk::DescriptorType::eUniformBuffer, mStickUBO->mBuffer.get(), {}}}, {}, 0);
+
+  std::vector vertices = StickVertices;
+  std::vector indices = StickIndices;
+  mStickMesh = std::make_shared<VulkanMesh>(mContext->getPhysicalDevice(), mContext->getDevice(),
+                                           mContext->getCommandPool(),
+                                           mContext->getGraphicsQueue(), vertices, indices, false);
+}
+
+
 void VulkanRendererForEditor::updateAxisUBO() {
   if (mAxesTransforms.size()) {
     copyToDevice<glm::mat4>(mContext->getDevice(), mAxesUBO->mMemory.get(), mAxesTransforms.data(),
-                            std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxes()));
+                            std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxisPassInstances()));
+  }
+}
+
+void VulkanRendererForEditor::updateStickUBO() {
+  if (mStickTransforms.size()) {
+    copyToDevice<glm::mat4>(mContext->getDevice(), mStickUBO->mMemory.get(), mStickTransforms.data(),
+                            std::min(static_cast<uint32_t>(mStickTransforms.size()), getMaxAxisPassInstances()));
   }
 }
 

@@ -77,17 +77,30 @@ public:
 
   //=== axis drawing ===//
 private:
+  // axis
   std::vector<glm::mat4> mAxesTransforms{};
   vk::UniqueDescriptorSet mAxesDescriptorSet {};
   std::unique_ptr<VulkanBufferData> mAxesUBO {};
   std::shared_ptr<VulkanMesh> mAxesMesh {};
   void updateAxisUBO();
+  void prepareAxesResources();
+
+  // stick
+  std::vector<glm::mat4> mStickTransforms{};
+  vk::UniqueDescriptorSet mStickDescriptorSet {};
+  std::unique_ptr<VulkanBufferData> mStickUBO {};
+  std::shared_ptr<VulkanMesh> mStickMesh {};
+  void updateStickUBO();
+  void prepareStickResources();
 
 public:
   inline void addAxes(glm::mat4 axesTransform) { mAxesTransforms.push_back(axesTransform); }
   void clearAxes() { mAxesTransforms.clear(); }
-  uint32_t getMaxAxes() { return 16; }
-  void prepareAxesResources();
+
+  inline void addStick(glm::mat4 stickTransform) { mStickTransforms.push_back(stickTransform); }
+  void clearSticks() { mStickTransforms.clear(); }
+
+  uint32_t getMaxAxisPassInstances() { return 32; }
 };
 
 } // namespace svulkan

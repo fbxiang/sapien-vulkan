@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(vulkanrenderer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS_DEBUG "-o0 -g3 -Wall")
-set(CMAKE_CXX_FLAGS_RELEASE "-o3 -g0 -Wall")
+set(CMAKE_CXX_FLAGS_DEBUG "-o0 -g3 -Wall -Wno-deprecated-declarations")
+set(CMAKE_CXX_FLAGS_RELEASE "-o3 -g0 -Wall -Wno-deprecated-declarations")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("-- DEBUG Build")
