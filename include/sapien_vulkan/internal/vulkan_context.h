@@ -1,12 +1,13 @@
 #pragma once
 
 #include "sapien_vulkan/common/glm_common.h"
+#include "sapien_vulkan/pass/axis.h"
+#include "sapien_vulkan/pass/composite.h"
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
-#include "sapien_vulkan/pass/axis.h"
 #include "sapien_vulkan/pass/transparency.h"
-#include "sapien_vulkan/pass/composite.h"
 #include "vulkan_renderer_config.h"
+#include "vulkan_resources_manager.h"
 #include <vulkan/vulkan.hpp>
 
 #ifdef ON_SCREEN
@@ -21,6 +22,7 @@ class VulkanRendererForEditor;
 
 class VulkanContext {
   bool mRequirePresent;
+  bool mRayTrace;
 
   vk::PhysicalDevice mPhysicalDevice;
   vk::UniqueInstance mInstance;
@@ -30,10 +32,10 @@ class VulkanContext {
 
   uint32_t graphicsQueueFamilyIndex;
 
-  std::shared_ptr<struct VulkanTextureData> mPlaceholderTexture{nullptr};
+  VulkanResourcesManager mResourcesManager;
 
 public:
-  VulkanContext(bool requirePresent = true);
+  VulkanContext(bool requirePresent = true, bool rayTrace = false);
   ~VulkanContext();
 
   /** Get the graphics queue */
@@ -88,12 +90,11 @@ public:
     return mDescriptorSetLayouts;
   }
 
-  std::vector<std::unique_ptr<Object>> loadObjects(std::string const &file,
-                                                   glm::vec3 scale = {1.f, 1.f, 1.f},
-                                                   bool ignoreRootTransform = true,
-                                                   glm::vec3 const &up = {0, 1, 0},
-                                                   glm::vec3 const &forward = {0, 0, -1});
+  std::unique_ptr<Object> createObject(std::shared_ptr<VulkanMesh> mesh,
+                                       std::shared_ptr<VulkanMaterial> material);
 
+  std::vector<std::unique_ptr<Object>> loadObjects(std::string const &file,
+                                                   glm::vec3 scale = {1.f, 1.f, 1.f});
   std::unique_ptr<Object> loadSphere();
   std::unique_ptr<Object> loadCube();
   std::unique_ptr<Object> loadCapsule(float radius, float halfLength);
@@ -107,7 +108,7 @@ public:
   createVulkanRendererForEditor(VulkanRendererConfig const &config = {});
   std::unique_ptr<struct Camera> createCamera() const;
 
-  std::shared_ptr<struct VulkanTextureData> loadTexture(std::string const &filename) const;
+  std::shared_ptr<struct VulkanTextureData> loadTexture(std::string const &filename);
   std::shared_ptr<struct VulkanTextureData> getPlaceholderTexture();
 
 #ifdef ON_SCREEN

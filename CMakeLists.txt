@@ -23,6 +23,7 @@ file(GLOB_RECURSE RENDER_SRC "src/*.cpp")
 set(ON_SCREEN TRUE CACHE BOOL "Vulkan renderer with on screen rendering") 
 set(COMPILE_SPV_SHADER FALSE CACHE BOOL "True to recompile the SPV shaders")
 include_directories("include")
+include_directories("$ENV{VULKAN_SDK}/include")
 
 if (${ON_SCREEN}) 
     find_package(glfw3 REQUIRED)
