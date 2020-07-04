@@ -14,6 +14,6 @@ VulkanScene::VulkanScene(vk::PhysicalDevice physicalDevice, vk::Device device,
 }
 
 void VulkanScene::updateUBO(SceneUBO const &ubo) {
-  copyToDevice(mDevice, mUBO->getMemory(), ubo);
+  copyToDevice<SceneUBO>(mDevice, mUBO->getMemory(), ubo);
 }
 }

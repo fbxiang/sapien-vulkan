@@ -46,8 +46,8 @@ else()
 endif()
 
 add_library(sapien-vulkan STATIC ${RENDER_SRC} ${GUI_SRC})
-target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} glfw3 dl pthread Vulkan::Vulkan spdlog stdc++fs)
+target_link_libraries(sapien-vulkan ${ASSIMP_LIBRARIES} glfw3 dl pthread Vulkan::Vulkan spdlog)
 add_dependencies(sapien-vulkan glsl)
 
 add_executable(main app/main.cpp)
-target_link_libraries(main sapien-vulkan)
+target_link_libraries(main sapien-vulkan stdc++fs)

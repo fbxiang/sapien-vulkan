@@ -97,6 +97,11 @@ void main() {
     vec3 pos = world2camera(vec4(sceneUBO.pointLights[i].position.xyz, 1.f)).xyz;
     vec3 l = pos - csPosition.xyz;
     float d = max(length(l), 0.0001);
+
+    if (length(l) == 0) {
+      continue;
+    }
+
     vec3 lightDir = normalize(l);
 
     // diffuse
@@ -112,6 +117,10 @@ void main() {
   }
 
   for (int i = 0; i < NUM_DIRECTIONAL_LIGHTS; ++i) {
+    if (length(sceneUBO.directionalLights[i].direction.xyz) == 0) {
+      continue;
+    }
+
     vec3 lightDir = -normalize((cameraUBO.viewMatrix *
                                 vec4(sceneUBO.directionalLights[i].direction.xyz, 0)).xyz);
 
