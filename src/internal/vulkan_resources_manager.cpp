@@ -205,6 +205,7 @@ VulkanResourcesManager::loadFile(std::string const &file) {
   Assimp::Importer importer;
   uint32_t flags = aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenNormals |
                    aiProcess_FlipUVs | aiProcess_PreTransformVertices;
+  importer.SetPropertyInteger(AI_CONFIG_PP_PTV_ADD_ROOT_TRANSFORMATION, 1);
   const aiScene *scene = importer.ReadFile(file, flags);
   if (scene->mRootNode->mMetaData) {
     throw std::runtime_error("Failed to load mesh file: file contains unsupported metadata, " +
