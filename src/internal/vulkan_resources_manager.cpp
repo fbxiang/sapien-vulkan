@@ -324,6 +324,11 @@ VulkanResourcesManager::loadFile(std::string const &file) {
       indices.push_back(face.mIndices[2]);
     }
 
+    if (vertices.size() == 0 || indices.size() == 0) {
+      log::warn("A mesh in the file has no triangles: {}", file);
+      continue;
+    }
+
     std::shared_ptr<VulkanMesh> vulkanMesh = std::make_shared<VulkanMesh>(
         mContext->getPhysicalDevice(), mContext->getDevice(), mContext->getCommandPool(),
         mContext->getGraphicsQueue(), vertices, indices, !mesh->HasNormals());
