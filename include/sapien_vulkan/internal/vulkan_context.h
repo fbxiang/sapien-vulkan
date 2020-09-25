@@ -74,9 +74,6 @@ private:
     vk::UniqueDescriptorSetLayout camera;
     vk::UniqueDescriptorSetLayout material;
     vk::UniqueDescriptorSetLayout object;
-
-    vk::UniqueDescriptorSetLayout deferred;
-    vk::UniqueDescriptorSetLayout composite;
   } mDescriptorSetLayouts;
 
 private:

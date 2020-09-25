@@ -20,19 +20,19 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
   mTransparencyPass = std::make_unique<TransparencyPass>(context);
   mCompositePass = std::make_unique<CompositePass>(context);
 
+  initializeDescriptorLayouts();
+
   mDeferredDescriptorSet =
       std::move(mContext->getDevice()
                     .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
-                        mContext->getDescriptorPool(), 1,
-                        &mContext->getDescriptorSetLayouts().deferred.get()))
+                        mContext->getDescriptorPool(), 1, &mDescriptorSetLayouts.deferred.get()))
                     .front());
   prepareAxesResources();
   prepareStickResources();
   mCompositeDescriptorSet =
       std::move(mContext->getDevice()
                     .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
-                        mContext->getDescriptorPool(), 1,
-                        &mContext->getDescriptorSetLayouts().composite.get()))
+                        mContext->getDescriptorPool(), 1, &mDescriptorSetLayouts.composite.get()))
                     .front());
 }
 
@@ -115,6 +115,17 @@ void VulkanRendererForEditor::initializeRenderTextures() {
       vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal,
       vk::ImageAspectFlagBits::eColor);
 
+  mRenderTargets.custom.resize(mConfig.customTextureCount);
+  for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    mRenderTargets.custom[i] = std::make_unique<VulkanImageData>(
+        mContext->getPhysicalDevice(), mContext->getDevice(), mRenderTargetFormats.colorFormat,
+        vk::Extent2D(mWidth, mHeight), 1, vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
+            vk::ImageUsageFlagBits::eTransferSrc,
+        vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal,
+        vk::ImageAspectFlagBits::eColor);
+  }
+
   auto commandBuffer = createCommandBuffer(mContext->getDevice(), mContext->getCommandPool(),
                                            vk::CommandBufferLevel::ePrimary);
 
@@ -165,6 +176,15 @@ void VulkanRendererForEditor::initializeRenderTextures() {
                               vk::PipelineStageFlagBits::eEarlyFragmentTests |
                                   vk::PipelineStageFlagBits::eLateFragmentTests,
                               vk::ImageAspectFlagBits::eDepth);
+        for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+          transitionImageLayout(
+              commandBuffer, mRenderTargets.custom[i].get()->mImage.get(),
+              mRenderTargetFormats.colorFormat, vk::ImageLayout::eUndefined,
+              vk::ImageLayout::eColorAttachmentOptimal, {},
+              vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+              vk::PipelineStageFlagBits::eTopOfPipe,
+              vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+        }
       });
 
   // bind textures to deferred descriptor set
@@ -184,6 +204,11 @@ void VulkanRendererForEditor::initializeRenderTextures() {
                               vk::ImageLayout::eShaderReadOnlyOptimal),
       vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.depth->mImageView.get(),
                               vk::ImageLayout::eShaderReadOnlyOptimal)};
+  for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    imageInfos.push_back(vk::DescriptorImageInfo(mDeferredSampler.get(),
+                                                 mRenderTargets.custom[i]->mImageView.get(),
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal));
+  }
   std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {vk::WriteDescriptorSet(
       mDeferredDescriptorSet.get(), 0, 0, imageInfos.size(),
       vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
@@ -206,10 +231,16 @@ void VulkanRendererForEditor::initializeRenderTextures() {
                               vk::ImageLayout::eShaderReadOnlyOptimal),
       vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.normal->mImageView.get(),
                               vk::ImageLayout::eShaderReadOnlyOptimal),
-      vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.segmentation->mImageView.get(),
+      vk::DescriptorImageInfo(mCompositeSampler.get(),
+                              mRenderTargets.segmentation->mImageView.get(),
                               vk::ImageLayout::eShaderReadOnlyOptimal),
       vk::DescriptorImageInfo(mCompositeSampler.get(), mRenderTargets.depth->mImageView.get(),
                               vk::ImageLayout::eShaderReadOnlyOptimal)};
+  for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    imageInfos.push_back(vk::DescriptorImageInfo(mDeferredSampler.get(),
+                                                 mRenderTargets.custom[i]->mImageView.get(),
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal));
+  }
   writeDescriptorSets = {vk::WriteDescriptorSet(
       mCompositeDescriptorSet.get(), 0, 0, imageInfos.size(),
       vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
@@ -246,21 +277,28 @@ void VulkanRendererForEditor::initializeRenderPasses() {
         mRenderTargetFormats.colorFormat, mRenderTargetFormats.colorFormat,
         mRenderTargetFormats.segmentationFormat};
 
+    std::vector<vk::ImageView> imageViews = {
+        mRenderTargets.albedo->mImageView.get(), mRenderTargets.position->mImageView.get(),
+        mRenderTargets.specular->mImageView.get(), mRenderTargets.normal->mImageView.get(),
+        mRenderTargets.segmentation->mImageView.get()};
+
+    for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+      colorFormats.push_back(mRenderTargetFormats.colorFormat);
+      imageViews.push_back(mRenderTargets.custom[i]->mImageView.get());
+    }
+
     mGBufferPass->initializePipeline(shaderDir, layouts, colorFormats,
                                      mRenderTargetFormats.depthFormat, cullMode,
                                      vk::FrontFace::eCounterClockwise);
     mGBufferPass->initializeFramebuffer(
-        {mRenderTargets.albedo->mImageView.get(), mRenderTargets.position->mImageView.get(),
-         mRenderTargets.specular->mImageView.get(), mRenderTargets.normal->mImageView.get(),
-         mRenderTargets.segmentation->mImageView.get()},
-        mRenderTargets.depth->mImageView.get(),
+        imageViews, mRenderTargets.depth->mImageView.get(),
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
   }
 
   // initialize deferred pass
   {
     std::vector<vk::DescriptorSetLayout> layouts = {l.scene.get(), l.camera.get(),
-                                                    l.deferred.get()};
+                                                    mDescriptorSetLayouts.deferred.get()};
     mDeferredPass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat});
     mDeferredPass->initializeFramebuffer(
         {mRenderTargets.lighting->mImageView.get()},
@@ -286,21 +324,26 @@ void VulkanRendererForEditor::initializeRenderPasses() {
         mRenderTargetFormats.colorFormat, mRenderTargetFormats.colorFormat,
         mRenderTargetFormats.colorFormat, mRenderTargetFormats.colorFormat,
         mRenderTargetFormats.colorFormat, mRenderTargetFormats.segmentationFormat};
+    std::vector<vk::ImageView> imageViews = {
+        mRenderTargets.lighting->mImageView.get(), mRenderTargets.albedo->mImageView.get(),
+        mRenderTargets.position->mImageView.get(), mRenderTargets.specular->mImageView.get(),
+        mRenderTargets.normal->mImageView.get(),   mRenderTargets.segmentation->mImageView.get()};
+    for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+      colorFormats.push_back(mRenderTargetFormats.colorFormat);
+      imageViews.push_back(mRenderTargets.custom[i]->mImageView.get());
+    }
 
     mTransparencyPass->initializePipeline(shaderDir, layouts, colorFormats,
                                           mRenderTargetFormats.depthFormat, cullMode,
                                           vk::FrontFace::eCounterClockwise);
     mTransparencyPass->initializeFramebuffer(
-        {mRenderTargets.lighting->mImageView.get(), mRenderTargets.albedo->mImageView.get(),
-         mRenderTargets.position->mImageView.get(), mRenderTargets.specular->mImageView.get(),
-         mRenderTargets.normal->mImageView.get(), mRenderTargets.segmentation->mImageView.get()},
-        mRenderTargets.depth->mImageView.get(),
+        imageViews, mRenderTargets.depth->mImageView.get(),
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
   }
 
   // initialize composite pass
   {
-    std::vector<vk::DescriptorSetLayout> layouts = {l.composite.get()};
+    std::vector<vk::DescriptorSetLayout> layouts = {mDescriptorSetLayouts.composite.get()};
     mCompositePass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat});
     mCompositePass->initializeFramebuffer(
         {mRenderTargets.lighting2->mImageView.get()},
@@ -338,7 +381,10 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})); // normal
     clearValues.push_back(
         vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})); // segmentation
-    clearValues.push_back(vk::ClearDepthStencilValue(1.0f, 0));         // depth
+    for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+      clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}));
+    }
+    clearValues.push_back(vk::ClearDepthStencilValue(1.0f, 0)); // depth
 
     vk::RenderPassBeginInfo renderPassBeginInfo{
         mGBufferPass->getRenderPass(), mGBufferPass->getFramebuffer(),
@@ -381,7 +427,8 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   {
     // transition to texture formats
     // for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-    //                  mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
+    //                  mRenderTargets.specular->mImage.get(),
+    //                  mRenderTargets.normal->mImage.get()}) {
     //   transitionImageLayout(
     //       commandBuffer, img, mRenderTargetFormats.colorFormat,
     //       vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -391,7 +438,8 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     // }
     // transitionImageLayout(
     //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-    //     vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+    //     vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    //     vk::ImageLayout::eShaderReadOnlyOptimal,
     //     vk::AccessFlagBits::eDepthStencilAttachmentWrite, vk::AccessFlagBits::eShaderRead,
     //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
     //         vk::PipelineStageFlagBits::eLateFragmentTests,
@@ -425,7 +473,8 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
 
     // transition textures back to gbuffer formats
     // for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-    //                  mRenderTargets.specular->mImage.get(), mRenderTargets.normal->mImage.get()}) {
+    //                  mRenderTargets.specular->mImage.get(),
+    //                  mRenderTargets.normal->mImage.get()}) {
     //   transitionImageLayout(
     //       commandBuffer, img, mRenderTargetFormats.colorFormat,
     //       vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
@@ -436,8 +485,8 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     // }
     // transitionImageLayout(
     //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-    //     vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eDepthStencilAttachmentOptimal,
-    //     vk::AccessFlagBits::eShaderRead,
+    //     vk::ImageLayout::eShaderReadOnlyOptimal,
+    //     vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::AccessFlagBits::eShaderRead,
     //     vk::AccessFlagBits::eDepthStencilAttachmentRead |
     //         vk::AccessFlagBits::eDepthStencilAttachmentWrite,
     //     vk::PipelineStageFlagBits::eFragmentShader,
@@ -475,8 +524,8 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
                                   vk::IndexType::eUint32);
     commandBuffer.drawIndexed(
         mAxesMesh->mIndexCount,
-        std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxisPassInstances()), 0, 0, 0);
-
+        std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxisPassInstances()), 0, 0,
+        0);
 
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                      mAxisPass->getPipelineLayout(), 0, mStickDescriptorSet.get(),
@@ -486,61 +535,62 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
                                   vk::IndexType::eUint32);
     commandBuffer.drawIndexed(
         mStickMesh->mIndexCount,
-        std::min(static_cast<uint32_t>(mStickTransforms.size()), getMaxAxisPassInstances()), 0, 0, 0);
+        std::min(static_cast<uint32_t>(mStickTransforms.size()), getMaxAxisPassInstances()), 0, 0,
+        0);
 
     commandBuffer.endRenderPass();
   }
 
   // transparency pass
   // if (scene.getTransparentObjects().size()) {
-    std::vector<vk::ClearValue> clearValues;
-    clearValues.resize(7);
-    vk::RenderPassBeginInfo renderPassBeginInfo{
-        mTransparencyPass->getRenderPass(), mTransparencyPass->getFramebuffer(),
-        vk::Rect2D({0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}),
-        static_cast<uint32_t>(clearValues.size()), clearValues.data()};
+  std::vector<vk::ClearValue> clearValues;
+  clearValues.resize(7 + mConfig.customTextureCount);
+  vk::RenderPassBeginInfo renderPassBeginInfo{
+      mTransparencyPass->getRenderPass(), mTransparencyPass->getFramebuffer(),
+      vk::Rect2D({0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}),
+      static_cast<uint32_t>(clearValues.size()), clearValues.data()};
 
-    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mTransparencyPass->getPipeline());
-    commandBuffer.setViewport(
-        0, {{0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}});
-    commandBuffer.setScissor(
-        0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
+  commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+  commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mTransparencyPass->getPipeline());
+  commandBuffer.setViewport(
+      0, {{0.f, 0.f, static_cast<float>(mWidth), static_cast<float>(mHeight), 0.f, 1.f}});
+  commandBuffer.setScissor(
+      0, {{{0, 0}, {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)}}});
 
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                     mTransparencyPass->getPipelineLayout(), 0,
-                                     scene.getVulkanScene()->getDescriptorSet(), nullptr);
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                     mTransparencyPass->getPipelineLayout(), 1,
-                                     camera.mDescriptorSet.get(), nullptr);
-    for (auto &obj : scene.getTransparentObjects()) {
-      auto vobj = obj->getVulkanObject();
-      if (vobj) {
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                         mTransparencyPass->getPipelineLayout(), 2,
-                                         vobj->mDescriptorSet.get(), nullptr);
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                         mTransparencyPass->getPipelineLayout(), 3,
-                                         vobj->mMaterial->getDescriptorSet(), nullptr);
-        commandBuffer.pushConstants<float>(mTransparencyPass->getPipelineLayout(),
-                                           vk::ShaderStageFlagBits::eFragment, 0,
-                                           obj->mVisibility);
+  commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                   mTransparencyPass->getPipelineLayout(), 0,
+                                   scene.getVulkanScene()->getDescriptorSet(), nullptr);
+  commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                   mTransparencyPass->getPipelineLayout(), 1,
+                                   camera.mDescriptorSet.get(), nullptr);
+  for (auto &obj : scene.getTransparentObjects()) {
+    auto vobj = obj->getVulkanObject();
+    if (vobj) {
+      commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                       mTransparencyPass->getPipelineLayout(), 2,
+                                       vobj->mDescriptorSet.get(), nullptr);
+      commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                       mTransparencyPass->getPipelineLayout(), 3,
+                                       vobj->mMaterial->getDescriptorSet(), nullptr);
+      commandBuffer.pushConstants<float>(mTransparencyPass->getPipelineLayout(),
+                                         vk::ShaderStageFlagBits::eFragment, 0, obj->mVisibility);
 
-        commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
-        commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0,
-                                      vk::IndexType::eUint32);
-        commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);
-      }
+      commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
+      commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0,
+                                    vk::IndexType::eUint32);
+      commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);
     }
-    commandBuffer.endRenderPass();
+  }
+  commandBuffer.endRenderPass();
   // }
 
   // composite pass
   {
     // transition to texture formats
-    for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
-                     mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
-                     mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
+    for (auto img :
+         {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
+          mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
+          mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
       transitionImageLayout(
           commandBuffer, img, mRenderTargetFormats.colorFormat,
           vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -555,7 +605,6 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
         vk::PipelineStageFlagBits::eEarlyFragmentTests |
             vk::PipelineStageFlagBits::eLateFragmentTests,
         vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eDepth);
-
 
     std::vector<vk::ClearValue> clearValues = {
         vk::ClearColorValue{std::array{0.f, 0.f, 0.f, 1.f}}};
@@ -577,9 +626,10 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     commandBuffer.endRenderPass();
 
     // transition textures back to gbuffer formats
-    for (auto img : {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
-        mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
-        mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
+    for (auto img :
+         {mRenderTargets.lighting->mImage.get(), mRenderTargets.albedo->mImage.get(),
+          mRenderTargets.position->mImage.get(), mRenderTargets.specular->mImage.get(),
+          mRenderTargets.normal->mImage.get(), mRenderTargets.segmentation->mImage.get()}) {
       transitionImageLayout(
           commandBuffer, img, mRenderTargetFormats.colorFormat,
           vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
@@ -698,8 +748,8 @@ std::vector<uint32_t> VulkanRendererForEditor::downloadSegmentation() {
 
 void VulkanRendererForEditor::prepareAxesResources() {
   mAxesUBO = std::make_unique<VulkanBufferData>(
-      mContext->getPhysicalDevice(), mContext->getDevice(), getMaxAxisPassInstances() * sizeof(glm::mat4),
-      vk::BufferUsageFlagBits::eUniformBuffer);
+      mContext->getPhysicalDevice(), mContext->getDevice(),
+      getMaxAxisPassInstances() * sizeof(glm::mat4), vk::BufferUsageFlagBits::eUniformBuffer);
 
   mAxesDescriptorSet = std::move(
       mContext->getDevice()
@@ -716,11 +766,10 @@ void VulkanRendererForEditor::prepareAxesResources() {
                                            mContext->getGraphicsQueue(), vertices, indices, false);
 }
 
-
 void VulkanRendererForEditor::prepareStickResources() {
   mStickUBO = std::make_unique<VulkanBufferData>(
-      mContext->getPhysicalDevice(), mContext->getDevice(), getMaxAxisPassInstances() * sizeof(glm::mat4),
-      vk::BufferUsageFlagBits::eUniformBuffer);
+      mContext->getPhysicalDevice(), mContext->getDevice(),
+      getMaxAxisPassInstances() * sizeof(glm::mat4), vk::BufferUsageFlagBits::eUniformBuffer);
 
   mStickDescriptorSet = std::move(
       mContext->getDevice()
@@ -728,27 +777,29 @@ void VulkanRendererForEditor::prepareStickResources() {
               mContext->getDescriptorPool(), 1, &mContext->getDescriptorSetLayouts().object.get()))
           .front());
   updateDescriptorSets(mContext->getDevice(), mStickDescriptorSet.get(),
-                       {{vk::DescriptorType::eUniformBuffer, mStickUBO->mBuffer.get(), {}}}, {}, 0);
+                       {{vk::DescriptorType::eUniformBuffer, mStickUBO->mBuffer.get(), {}}}, {},
+                       0);
 
   std::vector vertices = StickVertices;
   std::vector indices = StickIndices;
-  mStickMesh = std::make_shared<VulkanMesh>(mContext->getPhysicalDevice(), mContext->getDevice(),
-                                           mContext->getCommandPool(),
-                                           mContext->getGraphicsQueue(), vertices, indices, false);
+  mStickMesh = std::make_shared<VulkanMesh>(
+      mContext->getPhysicalDevice(), mContext->getDevice(), mContext->getCommandPool(),
+      mContext->getGraphicsQueue(), vertices, indices, false);
 }
-
 
 void VulkanRendererForEditor::updateAxisUBO() {
   if (mAxesTransforms.size()) {
-    copyToDevice<glm::mat4>(mContext->getDevice(), mAxesUBO->mMemory.get(), mAxesTransforms.data(),
-                            std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxisPassInstances()));
+    copyToDevice<glm::mat4>(
+        mContext->getDevice(), mAxesUBO->mMemory.get(), mAxesTransforms.data(),
+        std::min(static_cast<uint32_t>(mAxesTransforms.size()), getMaxAxisPassInstances()));
   }
 }
 
 void VulkanRendererForEditor::updateStickUBO() {
   if (mStickTransforms.size()) {
-    copyToDevice<glm::mat4>(mContext->getDevice(), mStickUBO->mMemory.get(), mStickTransforms.data(),
-                            std::min(static_cast<uint32_t>(mStickTransforms.size()), getMaxAxisPassInstances()));
+    copyToDevice<glm::mat4>(
+        mContext->getDevice(), mStickUBO->mMemory.get(), mStickTransforms.data(),
+        std::min(static_cast<uint32_t>(mStickTransforms.size()), getMaxAxisPassInstances()));
   }
 }
 
@@ -758,6 +809,47 @@ void VulkanRendererForEditor::switchToNormal() { mCompositePass->switchToNormalP
 
 void VulkanRendererForEditor::switchToDepth() { mCompositePass->switchToDepthPipeline(); }
 
-void VulkanRendererForEditor::switchToSegmentation() { mCompositePass->switchToSegmentationPipeline(); }
+void VulkanRendererForEditor::switchToSegmentation() {
+  mCompositePass->switchToSegmentationPipeline();
+}
+
+void VulkanRendererForEditor::switchToCustom() { mCompositePass->switchToCustomPipeline(); }
+
+void VulkanRendererForEditor::initializeDescriptorLayouts() {
+
+  std::vector<std::tuple<vk::DescriptorType, uint32_t, vk::ShaderStageFlags>> layout = {
+      {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}, // albedo
+      {vk::DescriptorType::eCombinedImageSampler, 1,
+       vk::ShaderStageFlagBits::eFragment}, // position
+      {vk::DescriptorType::eCombinedImageSampler, 1,
+       vk::ShaderStageFlagBits::eFragment}, // specular
+      {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}, // normal
+      {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}  // depth
+  };
+  for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    layout.push_back(
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
+  }
+  mDescriptorSetLayouts.deferred = createDescriptorSetLayout(mContext->getDevice(), layout);
+
+  layout = {
+      {vk::DescriptorType::eCombinedImageSampler, 1,
+       vk::ShaderStageFlagBits::eFragment}, // lighting
+      {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}, // albedo
+      {vk::DescriptorType::eCombinedImageSampler, 1,
+       vk::ShaderStageFlagBits::eFragment}, // position
+      {vk::DescriptorType::eCombinedImageSampler, 1,
+       vk::ShaderStageFlagBits::eFragment}, // specular
+      {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}, // normal
+      {vk::DescriptorType::eCombinedImageSampler, 1,
+       vk::ShaderStageFlagBits::eFragment}, // segmentation
+      {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment} // depth
+  };
+  for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    layout.push_back(
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
+  }
+  mDescriptorSetLayouts.composite = createDescriptorSetLayout(mContext->getDevice(), layout);
+}
 
 } // namespace svulkan

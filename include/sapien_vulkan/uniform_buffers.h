@@ -2,8 +2,7 @@
 #include "common/glm_common.h"
 #include "light.h"
 
-namespace svulkan
-{
+namespace svulkan {
 struct CameraUBO {
   glm::mat4 viewMatrix;
   glm::mat4 projectionMatrix;
@@ -12,7 +11,7 @@ struct CameraUBO {
 };
 
 struct PBRMaterialUBO {
-  glm::vec4 baseColor{0.3,0.3,0.3,1};
+  glm::vec4 baseColor{0.3, 0.3, 0.3, 1};
   float specular{0};
   float roughness{1};
   float metallic{0};
@@ -26,6 +25,7 @@ struct PBRMaterialUBO {
 struct ObjectUBO {
   glm::mat4 modelMatrix;
   glm::uvec4 segmentation;
+  glm::mat4 userData;
 };
 
 constexpr int NumDirectionalLights = 3;
@@ -36,4 +36,4 @@ struct SceneUBO {
   PointLight pointLights[NumPointLights];
 };
 
-}
+} // namespace svulkan

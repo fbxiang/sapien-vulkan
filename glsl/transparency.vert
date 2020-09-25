@@ -12,6 +12,7 @@ layout(binding = 0, set = 1) uniform CameraUBO {
 layout(binding = 0, set = 2) uniform ObjectUBO {
   mat4 modelMatrix;
   uvec4 segmentation;
+  mat4 userData;
 } objectUBO;
 
 

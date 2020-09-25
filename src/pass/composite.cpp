@@ -130,6 +130,10 @@ void CompositePass::initializePipeline(std::string shaderDir,
       shaderDir, mContext->getDevice(), outputFormats.size(), mPipelineLayout.get(),
       mRenderPass.get(), "composite_segmentation.frag.spv");
 
+  mPipelineCustom = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                                           mPipelineLayout.get(), mRenderPass.get(),
+                                           "composite_custom.frag.spv");
+
   mPipeline = mPipelineLighting.get();
 }
 
@@ -146,5 +150,7 @@ void CompositePass::switchToLightingPipeline() { mPipeline = mPipelineLighting.g
 void CompositePass::switchToDepthPipeline() { mPipeline = mPipelineDepth.get(); }
 
 void CompositePass::switchToSegmentationPipeline() { mPipeline = mPipelineSegmentation.get(); }
+
+void CompositePass::switchToCustomPipeline() { mPipeline = mPipelineCustom.get(); }
 
 } // namespace svulkan

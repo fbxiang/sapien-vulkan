@@ -2,8 +2,7 @@
 #include "vulkan.h"
 #include "vulkan_renderer_config.h"
 
-namespace svulkan
-{
+namespace svulkan {
 
 class VulkanContext;
 
@@ -12,6 +11,11 @@ class VulkanRenderer {
   VulkanRendererConfig mConfig;
 
   int mWidth, mHeight;
+
+  struct DescriptorSetLayouts {
+    vk::UniqueDescriptorSetLayout deferred;
+  } mDescriptorSetLayouts;
+  void initializeDescriptorLayouts();
 
   struct RenderTargets {
     std::unique_ptr<VulkanImageData> albedo;
@@ -22,6 +26,7 @@ class VulkanRenderer {
     std::unique_ptr<VulkanImageData> depth;
 
     std::unique_ptr<VulkanImageData> lighting;
+    std::vector<std::unique_ptr<VulkanImageData>> custom;
   } mRenderTargets;
 
   struct RenderTargetFormats {
@@ -36,7 +41,7 @@ class VulkanRenderer {
   vk::UniqueDescriptorSet mDeferredDescriptorSet;
   vk::UniqueSampler mDeferredSampler;
 
- public:
+public:
   VulkanRenderer(VulkanContext &context, VulkanRendererConfig const &config);
 
   VulkanRenderer(VulkanRenderer const &other) = delete;
@@ -51,8 +56,8 @@ class VulkanRenderer {
 
   void render(vk::CommandBuffer commandBuffer, class Scene &scene, class Camera &camera);
   /* blit image to screen */
-  void display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage, vk::Format swapchainFormat,
-               uint32_t width, uint32_t height);
+  void display(vk::CommandBuffer commandBuffer, vk::Image swapchainImage,
+               vk::Format swapchainFormat, uint32_t width, uint32_t height);
 
   std::vector<float> downloadAlbedo();
   std::vector<float> downloadPosition();
@@ -61,10 +66,9 @@ class VulkanRenderer {
   std::vector<uint32_t> downloadSegmentation();
   std::vector<float> downloadDepth();
   std::vector<float> downloadLighting();
+  std::vector<float> downloadCustom(uint32_t index);
 
-  inline RenderTargets &getRenderTargets() {
-    return mRenderTargets;
-  }
+  inline RenderTargets &getRenderTargets() { return mRenderTargets; }
 };
 
-}
+} // namespace svulkan

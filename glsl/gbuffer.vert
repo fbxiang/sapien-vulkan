@@ -12,6 +12,7 @@ layout(binding = 0, set = 1) uniform CameraUBO {
 layout(binding = 0, set = 2) uniform ObjectUBO {
   mat4 modelMatrix;
   uvec4 segmentation;
+  mat4 userData;
 } objectUBO;
 
 
@@ -24,13 +25,16 @@ layout(location = 4) in vec3 bitangent;
 layout(location = 0) out vec4 outPosition;
 layout(location = 1) out vec2 outUV;
 layout(location = 2) out flat uvec4 outSegmentation;
-layout(location = 3) out mat3 outTbn;
+layout(location = 3) out vec3 objectCoord;
+layout(location = 4) out mat3 outTbn;
 
 void main() {
   outSegmentation = objectUBO.segmentation;
 
   mat4 modelView = cameraUBO.viewMatrix * objectUBO.modelMatrix;
   mat3 normalMatrix = mat3(transpose(inverse(modelView)));
+
+  objectCoord = pos;
 
   outPosition = modelView * vec4(pos, 1);
   outUV = uv;

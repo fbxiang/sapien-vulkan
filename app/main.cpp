@@ -87,7 +87,9 @@ void LoadCustom(VulkanContext &context, Scene &scene) {
 int main() {
   VulkanContext context;
   auto device = context.getDevice();
-  auto renderer = context.createVulkanRendererForEditor();
+  VulkanRendererConfig config;
+  config.customTextureCount = 1;
+  auto renderer = context.createVulkanRendererForEditor(config);
   // auto renderer = context.createVulkanRenderer();
   auto m = glm::mat4(1);
   m[0][0] = 0.1;

@@ -30,6 +30,7 @@ layout(location = 2) out vec4 outPosition;
 layout(location = 3) out vec4 outSpecular;
 layout(location = 4) out vec4 outNormal;
 layout(location = 5) out uvec4 outSegmentation;
+layout(location = 6) out vec4 outCustom;
 
 
 //=== lighting resources ===//

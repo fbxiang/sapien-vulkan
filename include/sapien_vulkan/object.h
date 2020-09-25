@@ -1,31 +1,31 @@
 #pragma once
 #include "common/glm_common.h"
-#include <memory>
 #include "internal/vulkan_object.h"
+#include <memory>
 #include <vector>
 
-namespace svulkan 
-{
+namespace svulkan {
 
-class Object
-{
+class Object {
   std::unique_ptr<VulkanObject> mVulkanObject = nullptr;
   Object *mParent = nullptr;
   std::vector<std::unique_ptr<Object>> mChildren = {};
   uint32_t mObjectId = 0u;  // unique id for this object
-  uint32_t mSegmentId = 0u;  // custom id
+  uint32_t mSegmentId = 0u; // custom id
 
   class Scene *mScene = nullptr;
 
   bool mMarkedForRemove = false;
 
- public:
+  glm::mat4 mUserData{1};
+
+public:
   // cache
   glm::mat4 mGlobalModelMatrixCache;
 
- public:
+public:
   std::string mName = "";
-  float mVisibility = 1.f;  // this visibility should only be used in editor rendering
+  float mVisibility = 1.f; // this visibility should only be used in editor rendering
   Transform mTransform = {};
 
   Object(std::unique_ptr<VulkanObject> vulkanObject);
@@ -47,7 +47,7 @@ class Object
 
   void updateVulkanObject();
 
-  inline VulkanObject *getVulkanObject() { return mVulkanObject.get(); }
+  inline VulkanObject *getVulkanObject() const { return mVulkanObject.get(); }
 
   inline std::vector<std::unique_ptr<Object>> const &getChildren() { return mChildren; }
 
@@ -55,13 +55,16 @@ class Object
   inline bool isMarkedForRemove() const { return mMarkedForRemove; }
 
   inline void setObjectId(uint32_t id) { mObjectId = id; }
-  inline uint32_t getObjectId() { return mObjectId; }
+  inline uint32_t getObjectId() const { return mObjectId; }
 
   inline void setSegmentId(uint32_t id) { mSegmentId = id; }
-  inline uint32_t getSegmentId() { return mSegmentId; }
+  inline uint32_t getSegmentId() const { return mSegmentId; }
 
   void updateMaterial(PBRMaterialUBO material);
-  inline std::shared_ptr<VulkanMaterial> getMaterial() { return mVulkanObject->mMaterial; }
+  inline std::shared_ptr<VulkanMaterial> getMaterial() const { return mVulkanObject->mMaterial; }
+
+  void setUserData(std::vector<float> userData);
+  std::vector<float> getUserData(std::vector<float> userData) const;
 };
 
-}
+} // namespace svulkan

@@ -12,6 +12,12 @@ class VulkanRendererForEditor {
 
   int mWidth, mHeight;
 
+  struct DescriptorSetLayouts {
+    vk::UniqueDescriptorSetLayout deferred;
+    vk::UniqueDescriptorSetLayout composite;
+  } mDescriptorSetLayouts;
+  void initializeDescriptorLayouts();
+
   struct RenderTargets {
     std::unique_ptr<VulkanImageData> albedo;
     std::unique_ptr<VulkanImageData> position;
@@ -22,6 +28,7 @@ class VulkanRendererForEditor {
 
     std::unique_ptr<VulkanImageData> lighting;
     std::unique_ptr<VulkanImageData> lighting2;  // ping pong buffer for lighting
+    std::vector<std::unique_ptr<VulkanImageData>> custom;
   } mRenderTargets;
 
   struct RenderTargetFormats {
@@ -59,6 +66,7 @@ public:
   void switchToNormal();
   void switchToDepth();
   void switchToSegmentation();
+  void switchToCustom();
 
   void render(vk::CommandBuffer commandBuffer, class Scene &scene, class Camera &camera);
   /* blit image to screen */
