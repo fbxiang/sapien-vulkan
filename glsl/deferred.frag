@@ -38,7 +38,7 @@ vec4 world2camera(vec4 pos) {
 }
 
 vec3 getBackgroundColor(vec3 texcoord) {
-  return vec3(0,0,0);
+  return vec3(1,1,1);
   // float r = sqrt(texcoord.x * texcoord.x + texcoord.z * texcoord.z);
   // float angle = atan(texcoord.y / r) * 57.3;
 
