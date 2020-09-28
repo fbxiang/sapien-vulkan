@@ -544,7 +544,6 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   }
 
   // transparency pass
-  // if (scene.getTransparentObjects().size()) {
   std::vector<vk::ClearValue> clearValues;
   clearValues.resize(7 + mConfig.customTextureCount);
   vk::RenderPassBeginInfo renderPassBeginInfo{
@@ -584,7 +583,6 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     }
   }
   commandBuffer.endRenderPass();
-  // }
 
   // composite pass
   {

@@ -7,4 +7,5 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
   outColor = texture(lightingSampler, inUV);
+  outColor = pow(outColor, vec4(1/2.2, 1/2.2, 1/2.2, 1));
 }

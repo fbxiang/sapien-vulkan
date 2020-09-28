@@ -14,6 +14,7 @@ class VulkanRenderer {
 
   struct DescriptorSetLayouts {
     vk::UniqueDescriptorSetLayout deferred;
+    vk::UniqueDescriptorSetLayout composite;
   } mDescriptorSetLayouts;
   void initializeDescriptorLayouts();
 
@@ -26,6 +27,7 @@ class VulkanRenderer {
     std::unique_ptr<VulkanImageData> depth;
 
     std::unique_ptr<VulkanImageData> lighting;
+    std::unique_ptr<VulkanImageData> lighting2;
     std::vector<std::unique_ptr<VulkanImageData>> custom;
   } mRenderTargets;
 
@@ -38,8 +40,13 @@ class VulkanRenderer {
   std::unique_ptr<class GBufferPass> mGBufferPass;
   std::unique_ptr<class DeferredPass> mDeferredPass;
   std::unique_ptr<class TransparencyPass> mTransparencyPass;
+  std::unique_ptr<class CompositePass> mCompositePass;
+
   vk::UniqueDescriptorSet mDeferredDescriptorSet;
   vk::UniqueSampler mDeferredSampler;
+
+  vk::UniqueDescriptorSet mCompositeDescriptorSet;
+  vk::UniqueSampler mCompositeSampler;
 
 public:
   VulkanRenderer(VulkanContext &context, VulkanRendererConfig const &config);
