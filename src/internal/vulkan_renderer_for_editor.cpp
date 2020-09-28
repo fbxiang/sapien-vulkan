@@ -344,7 +344,9 @@ void VulkanRendererForEditor::initializeRenderPasses() {
   // initialize composite pass
   {
     std::vector<vk::DescriptorSetLayout> layouts = {mDescriptorSetLayouts.composite.get()};
-    mCompositePass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat});
+    mCompositePass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat},
+                                       {"composite", "composite_normal", "composite_depth",
+                                        "composite_segmentation", "composite_custom"});
     mCompositePass->initializeFramebuffer(
         {mRenderTargets.lighting2->mImageView.get()},
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
@@ -598,6 +600,15 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
           vk::PipelineStageFlagBits::eColorAttachmentOutput,
           vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eColor);
     }
+    for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+      transitionImageLayout(
+          commandBuffer, mRenderTargets.custom[i]->mImage.get(), mRenderTargetFormats.colorFormat,
+          vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+          vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
+          vk::PipelineStageFlagBits::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eColor);
+    }
+
     transitionImageLayout(
         commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
         vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -803,17 +814,23 @@ void VulkanRendererForEditor::updateStickUBO() {
   }
 }
 
-void VulkanRendererForEditor::switchToLighting() { mCompositePass->switchToLightingPipeline(); }
+void VulkanRendererForEditor::switchToLighting() { mCompositePass->switchToPipeline("composite"); }
 
-void VulkanRendererForEditor::switchToNormal() { mCompositePass->switchToNormalPipeline(); }
-
-void VulkanRendererForEditor::switchToDepth() { mCompositePass->switchToDepthPipeline(); }
-
-void VulkanRendererForEditor::switchToSegmentation() {
-  mCompositePass->switchToSegmentationPipeline();
+void VulkanRendererForEditor::switchToNormal() {
+  mCompositePass->switchToPipeline("composite_normal");
 }
 
-void VulkanRendererForEditor::switchToCustom() { mCompositePass->switchToCustomPipeline(); }
+void VulkanRendererForEditor::switchToDepth() {
+  mCompositePass->switchToPipeline("composite_depth");
+}
+
+void VulkanRendererForEditor::switchToSegmentation() {
+  mCompositePass->switchToPipeline("composite_segmentation");
+}
+
+void VulkanRendererForEditor::switchToCustom() {
+  mCompositePass->switchToPipeline("composite_custom");
+}
 
 void VulkanRendererForEditor::initializeDescriptorLayouts() {
 

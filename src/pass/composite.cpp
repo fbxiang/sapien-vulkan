@@ -102,9 +102,10 @@ static vk::UniquePipeline createGraphicsPipeline(std::string const &shaderDir, v
 
 CompositePass::CompositePass(VulkanContext &context) : mContext(&context) {}
 
-void CompositePass::initializePipeline(std::string shaderDir,
+void CompositePass::initializePipeline(std::string const &shaderDir,
                                        std::vector<vk::DescriptorSetLayout> const &layouts,
-                                       std::vector<vk::Format> const &outputFormats) {
+                                       std::vector<vk::Format> const &outputFormats,
+                                       std::vector<std::string> const &pipelineNames) {
   mShaderDir = shaderDir;
   mOutputFormats = outputFormats;
   mLayouts = layouts;
@@ -114,27 +115,36 @@ void CompositePass::initializePipeline(std::string shaderDir,
 
   mRenderPass = createRenderPass(mContext->getDevice(), outputFormats);
 
-  mPipelineLighting =
-      createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
-                             mPipelineLayout.get(), mRenderPass.get(), "composite.frag.spv");
+  for (auto &name : pipelineNames) {
+    mPipelines[name] =
+        createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+                               mPipelineLayout.get(), mRenderPass.get(), name + ".frag.spv");
+  }
 
-  mPipelineNormal = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
-                                           mPipelineLayout.get(), mRenderPass.get(),
-                                           "composite_normal.frag.spv");
+  // mPipelineLighting =
+  //     createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+  //                            mPipelineLayout.get(), mRenderPass.get(), "composite.frag.spv");
 
-  mPipelineDepth =
-      createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
-                             mPipelineLayout.get(), mRenderPass.get(), "composite_depth.frag.spv");
+  // mPipelineNormal = createGraphicsPipeline(shaderDir, mContext->getDevice(),
+  // outputFormats.size(),
+  //                                          mPipelineLayout.get(), mRenderPass.get(),
+  //                                          "composite_normal.frag.spv");
 
-  mPipelineSegmentation = createGraphicsPipeline(
-      shaderDir, mContext->getDevice(), outputFormats.size(), mPipelineLayout.get(),
-      mRenderPass.get(), "composite_segmentation.frag.spv");
+  // mPipelineDepth =
+  //     createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
+  //                            mPipelineLayout.get(), mRenderPass.get(),
+  //                            "composite_depth.frag.spv");
 
-  mPipelineCustom = createGraphicsPipeline(shaderDir, mContext->getDevice(), outputFormats.size(),
-                                           mPipelineLayout.get(), mRenderPass.get(),
-                                           "composite_custom.frag.spv");
+  // mPipelineSegmentation = createGraphicsPipeline(
+  //     shaderDir, mContext->getDevice(), outputFormats.size(), mPipelineLayout.get(),
+  //     mRenderPass.get(), "composite_segmentation.frag.spv");
 
-  mPipeline = mPipelineLighting.get();
+  // mPipelineCustom = createGraphicsPipeline(shaderDir, mContext->getDevice(),
+  // outputFormats.size(),
+  //                                          mPipelineLayout.get(), mRenderPass.get(),
+  //                                          "composite_custom.frag.spv");
+
+  mPipeline = mPipelines[pipelineNames[0]].get();
 }
 
 void CompositePass::initializeFramebuffer(std::vector<vk::ImageView> const &outputImageViews,
@@ -143,14 +153,18 @@ void CompositePass::initializeFramebuffer(std::vector<vk::ImageView> const &outp
       createFramebuffer(mContext->getDevice(), mRenderPass.get(), outputImageViews, {}, extent);
 }
 
-void CompositePass::switchToNormalPipeline() { mPipeline = mPipelineNormal.get(); }
+// void CompositePass::switchToNormalPipeline() { mPipeline = mPipelineNormal.get(); }
 
-void CompositePass::switchToLightingPipeline() { mPipeline = mPipelineLighting.get(); }
+// void CompositePass::switchToLightingPipeline() { mPipeline = mPipelineLighting.get(); }
 
-void CompositePass::switchToDepthPipeline() { mPipeline = mPipelineDepth.get(); }
+// void CompositePass::switchToDepthPipeline() { mPipeline = mPipelineDepth.get(); }
 
-void CompositePass::switchToSegmentationPipeline() { mPipeline = mPipelineSegmentation.get(); }
+// void CompositePass::switchToSegmentationPipeline() { mPipeline = mPipelineSegmentation.get(); }
 
-void CompositePass::switchToCustomPipeline() { mPipeline = mPipelineCustom.get(); }
+// void CompositePass::switchToCustomPipeline() { mPipeline = mPipelineCustom.get(); }
+
+void CompositePass::switchToPipeline(std::string const &name) {
+  mPipeline = mPipelines[name].get();
+}
 
 } // namespace svulkan

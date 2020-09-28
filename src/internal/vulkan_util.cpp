@@ -4,8 +4,8 @@
 #include <numeric>
 
 namespace svulkan {
-static uint32_t findMemoryType(vk::PhysicalDeviceMemoryProperties const &memoryProperties, uint32_t typeBits,
-                               vk::MemoryPropertyFlags requirementsMask) {
+static uint32_t findMemoryType(vk::PhysicalDeviceMemoryProperties const &memoryProperties,
+                               uint32_t typeBits, vk::MemoryPropertyFlags requirementsMask) {
   uint32_t typeIndex = ~0u;
   for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
     if ((typeBits & 1) &&
@@ -26,10 +26,12 @@ vk::UniqueShaderModule createShaderModule(vk::Device device, const std::string &
   std::vector<uint32_t> shaderCode(code.size() / sizeof(uint32_t));
   std::memcpy(shaderCode.data(), code.data(), shaderCode.size() * sizeof(uint32_t));
 
-  return device.createShaderModuleUnique(
-      vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(),
-                                 code.size(),
-                                 shaderCode.data()));
+  try {
+    return device.createShaderModuleUnique(
+        vk::ShaderModuleCreateInfo(vk::ShaderModuleCreateFlags(), code.size(), shaderCode.data()));
+  } catch (const std::runtime_error &error) {
+    throw std::runtime_error("Failed to load " + filename);
+  }
 }
 
 vk::UniqueDeviceMemory allocateMemory(vk::Device device,
@@ -39,7 +41,8 @@ vk::UniqueDeviceMemory allocateMemory(vk::Device device,
   uint32_t memoryTypeIndex =
       findMemoryType(memoryProperties, memoryRequirements.memoryTypeBits, memoryPropertyFlags);
 
-  return device.allocateMemoryUnique(vk::MemoryAllocateInfo(memoryRequirements.size, memoryTypeIndex));
+  return device.allocateMemoryUnique(
+      vk::MemoryAllocateInfo(memoryRequirements.size, memoryTypeIndex));
 }
 
 void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::Image image, vk::Format format,
@@ -49,10 +52,10 @@ void transitionImageLayout(vk::CommandBuffer commandBuffer, vk::Image image, vk:
                            vk::ImageAspectFlags aspectMask, uint32_t mipLevels) {
   vk::ImageSubresourceRange imageSubresourceRange(aspectMask, 0, mipLevels, 0, 1);
   vk::ImageMemoryBarrier barrier(sourceAccessMask, destAccessMask, oldImageLayout, newImageLayout,
-                                 VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image, imageSubresourceRange);
+                                 VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image,
+                                 imageSubresourceRange);
   commandBuffer.pipelineBarrier(sourceStage, destStage, {}, nullptr, nullptr, barrier);
 }
-
 
 void updateDescriptorSets(
     vk::Device device, vk::DescriptorSet descriptorSet,
@@ -68,11 +71,11 @@ void updateDescriptorSets(
   uint32_t dstBinding = bindingOffset;
   for (auto const &bd : bufferData) {
     bufferInfos.push_back(vk::DescriptorBufferInfo(std::get<1>(bd), 0, VK_WHOLE_SIZE));
-    writeDescriptorSets.push_back(vk::WriteDescriptorSet(descriptorSet, dstBinding++, 0, 1, std::get<0>(bd),
-                                                         nullptr, &bufferInfos.back(),
-                                                         std::get<2>(bd) ? &std::get<2>(bd) : nullptr));
+    writeDescriptorSets.push_back(
+        vk::WriteDescriptorSet(descriptorSet, dstBinding++, 0, 1, std::get<0>(bd), nullptr,
+                               &bufferInfos.back(), std::get<2>(bd) ? &std::get<2>(bd) : nullptr));
   }
-  
+
   std::vector<vk::DescriptorImageInfo> imageInfos;
   for (auto const &tex : textureData) {
     imageInfos.push_back(vk::DescriptorImageInfo(tex->mTextureSampler.get(),
@@ -80,20 +83,19 @@ void updateDescriptorSets(
                                                  vk::ImageLayout::eShaderReadOnlyOptimal));
   }
   if (imageInfos.size()) {
-    writeDescriptorSets.push_back(vk::WriteDescriptorSet(descriptorSet, dstBinding, 0, imageInfos.size(),
-                                                         vk::DescriptorType::eCombinedImageSampler,
-                                                         imageInfos.data()));
+    writeDescriptorSets.push_back(
+        vk::WriteDescriptorSet(descriptorSet, dstBinding, 0, imageInfos.size(),
+                               vk::DescriptorType::eCombinedImageSampler, imageInfos.data()));
   }
   device.updateDescriptorSets(writeDescriptorSets, nullptr);
 }
 
 vk::UniqueCommandBuffer createCommandBuffer(vk::Device device, vk::CommandPool commandPool,
                                             vk::CommandBufferLevel level) {
-  return std::move
-      (device.allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(commandPool, level, 1)).front());
+  return std::move(
+      device.allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(commandPool, level, 1))
+          .front());
 }
-
-
 
 vk::UniqueDescriptorSetLayout createDescriptorSetLayout(
     vk::Device device,
@@ -106,30 +108,31 @@ vk::UniqueDescriptorSetLayout createDescriptorSetLayout(
 #endif
 
   for (size_t i = 0; i < bindingData.size(); i++) {
-    bindings[i] = vk::DescriptorSetLayoutBinding(static_cast<uint32_t>(i), std::get<0>(bindingData[i]),
-                                                 std::get<1>(bindingData[i]), std::get<2>(bindingData[i]));
+    bindings[i] =
+        vk::DescriptorSetLayoutBinding(static_cast<uint32_t>(i), std::get<0>(bindingData[i]),
+                                       std::get<1>(bindingData[i]), std::get<2>(bindingData[i]));
   }
-  return device.createDescriptorSetLayoutUnique(
-      vk::DescriptorSetLayoutCreateInfo(flags, static_cast<uint32_t>(bindings.size()), bindings.data()));
+  return device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo(
+      flags, static_cast<uint32_t>(bindings.size()), bindings.data()));
 }
 
-vk::UniqueDescriptorPool createDescriptorPool(vk::Device device,
-                                              std::vector<vk::DescriptorPoolSize> const &poolSizes) {
+vk::UniqueDescriptorPool
+createDescriptorPool(vk::Device device, std::vector<vk::DescriptorPoolSize> const &poolSizes) {
   assert(!poolSizes.empty());
   uint32_t maxSets = std::accumulate(
       poolSizes.begin(), poolSizes.end(), 0,
       [](uint32_t sum, vk::DescriptorPoolSize const &dps) { return sum + dps.descriptorCount; });
   assert(maxSets > 0);
 
-  vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                                        maxSets, static_cast<uint32_t>(poolSizes.size()),
-                                                        poolSizes.data());
+  vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo(
+      vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, maxSets,
+      static_cast<uint32_t>(poolSizes.size()), poolSizes.data());
   return device.createDescriptorPoolUnique(descriptorPoolCreateInfo);
 }
 
 vk::UniqueFramebuffer createFramebuffer(vk::Device device, vk::RenderPass renderPass,
-                                        std::vector<vk::ImageView> const&colorImageViews,
-                                        vk::ImageView depthImageView, vk::Extent2D const&extent) {
+                                        std::vector<vk::ImageView> const &colorImageViews,
+                                        vk::ImageView depthImageView, vk::Extent2D const &extent) {
   std::vector<vk::ImageView> imageViews = colorImageViews;
   if (depthImageView) {
     imageViews.push_back(depthImageView);
@@ -139,4 +142,4 @@ vk::UniqueFramebuffer createFramebuffer(vk::Device device, vk::RenderPass render
   return device.createFramebufferUnique(info);
 }
 
-}
+} // namespace svulkan

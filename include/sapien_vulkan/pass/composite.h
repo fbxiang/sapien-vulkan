@@ -1,5 +1,6 @@
 #pragma once
 #include "sapien_vulkan/internal/vulkan.h"
+#include <map>
 
 namespace svulkan {
 class VulkanContext;
@@ -12,11 +13,13 @@ class CompositePass {
 
   vk::Pipeline mPipeline;
 
-  vk::UniquePipeline mPipelineLighting;
-  vk::UniquePipeline mPipelineNormal;
-  vk::UniquePipeline mPipelineDepth;
-  vk::UniquePipeline mPipelineSegmentation;
-  vk::UniquePipeline mPipelineCustom;
+  // vk::UniquePipeline mPipelineLighting;
+  // vk::UniquePipeline mPipelineNormal;
+  // vk::UniquePipeline mPipelineDepth;
+  // vk::UniquePipeline mPipelineSegmentation;
+  // vk::UniquePipeline mPipelineCustom;
+  std::map<std::string, vk::UniquePipeline> mPipelines;
+
   vk::UniqueFramebuffer mFramebuffer;
 
   std::string mShaderDir;
@@ -32,9 +35,10 @@ public:
   CompositePass(CompositePass &&other) = default;
   CompositePass &operator=(CompositePass &&other) = default;
 
-  void initializePipeline(std::string shaderDir,
+  void initializePipeline(std::string const &shaderDir,
                           std::vector<vk::DescriptorSetLayout> const &layouts,
-                          std::vector<vk::Format> const &outputFormats);
+                          std::vector<vk::Format> const &outputFormats,
+                          std::vector<std::string> const &pipelineNames);
 
   void initializeFramebuffer(std::vector<vk::ImageView> const &outputImageViews,
                              vk::Extent2D const &extent);
@@ -44,11 +48,7 @@ public:
   inline vk::PipelineLayout getPipelineLayout() { return mPipelineLayout.get(); }
   inline vk::Pipeline getPipeline() { return mPipeline; }
 
-  void switchToNormalPipeline();
-  void switchToLightingPipeline();
-  void switchToDepthPipeline();
-  void switchToSegmentationPipeline();
-  void switchToCustomPipeline();
+  void switchToPipeline(std::string const &name);
 };
 
 } // namespace svulkan
