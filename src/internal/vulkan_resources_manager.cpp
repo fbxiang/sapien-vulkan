@@ -316,7 +316,7 @@ VulkanResourcesManager::loadFile(std::string const &file) {
     for (uint32_t f = 0; f < mesh->mNumFaces; f++) {
       auto face = mesh->mFaces[f];
       if (face.mNumIndices != 3) {
-        fprintf(stderr, "A face with %d indices is found and ignored.", face.mNumIndices);
+        // fprintf(stderr, "A face with %d indices is found and ignored.", face.mNumIndices);
         continue;
       }
       indices.push_back(face.mIndices[0]);
