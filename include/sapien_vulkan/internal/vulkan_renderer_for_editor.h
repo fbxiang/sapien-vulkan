@@ -15,6 +15,7 @@ class VulkanRendererForEditor {
   struct DescriptorSetLayouts {
     vk::UniqueDescriptorSetLayout deferred;
     vk::UniqueDescriptorSetLayout composite;
+    vk::UniqueDescriptorSetLayout deferredShadow;
   } mDescriptorSetLayouts;
   void initializeDescriptorLayouts();
 
@@ -27,8 +28,9 @@ class VulkanRendererForEditor {
     std::unique_ptr<VulkanImageData> depth;
 
     std::unique_ptr<VulkanImageData> lighting;
-    std::unique_ptr<VulkanImageData> lighting2;  // ping pong buffer for lighting
+    std::unique_ptr<VulkanImageData> lighting2; // ping pong buffer for lighting
     std::vector<std::unique_ptr<VulkanImageData>> custom;
+    std::unique_ptr<VulkanImageData> shadow;
   } mRenderTargets;
 
   struct RenderTargetFormats {
@@ -37,6 +39,7 @@ class VulkanRendererForEditor {
     vk::Format depthFormat;
   } mRenderTargetFormats;
 
+  std::unique_ptr<class ShadowPass> mShadowPass;
   std::unique_ptr<class GBufferPass> mGBufferPass;
   std::unique_ptr<class DeferredPass> mDeferredPass;
   std::unique_ptr<class AxisPass> mAxisPass;
@@ -83,21 +86,28 @@ public:
 
   inline RenderTargets &getRenderTargets() { return mRenderTargets; }
 
+private:
+  std::unique_ptr<VulkanBufferData> mShadowCameraUBO{};
+  vk::UniqueDescriptorSet mShadowCameraDescriptorSet{};
+  vk::UniqueDescriptorSet mDeferredShadowDescriptorSet{};
+  void updateShadowCameraUBO(Scene &scene, Camera &camera);
+  void prepareShadowResources();
+
   //=== axis drawing ===//
 private:
   // axis
   std::vector<glm::mat4> mAxesTransforms{};
-  vk::UniqueDescriptorSet mAxesDescriptorSet {};
-  std::unique_ptr<VulkanBufferData> mAxesUBO {};
-  std::shared_ptr<VulkanMesh> mAxesMesh {};
+  vk::UniqueDescriptorSet mAxesDescriptorSet{};
+  std::unique_ptr<VulkanBufferData> mAxesUBO{};
+  std::shared_ptr<VulkanMesh> mAxesMesh{};
   void updateAxisUBO();
   void prepareAxesResources();
 
   // stick
   std::vector<glm::mat4> mStickTransforms{};
-  vk::UniqueDescriptorSet mStickDescriptorSet {};
-  std::unique_ptr<VulkanBufferData> mStickUBO {};
-  std::shared_ptr<VulkanMesh> mStickMesh {};
+  vk::UniqueDescriptorSet mStickDescriptorSet{};
+  std::unique_ptr<VulkanBufferData> mStickUBO{};
+  std::shared_ptr<VulkanMesh> mStickMesh{};
   void updateStickUBO();
   void prepareStickResources();
 

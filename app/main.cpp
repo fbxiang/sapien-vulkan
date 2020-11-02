@@ -1,15 +1,16 @@
+#include "sapien_vulkan/camera.h"
+#include "sapien_vulkan/camera_controller.h"
+#include "sapien_vulkan/common/log.h"
 #include "sapien_vulkan/internal/vulkan_context.h"
 #include "sapien_vulkan/internal/vulkan_renderer.h"
 #include "sapien_vulkan/internal/vulkan_renderer_for_editor.h"
-#include "sapien_vulkan/scene.h"
-#include "sapien_vulkan/common/log.h"
 #include "sapien_vulkan/pass/axis.h"
-#include "sapien_vulkan/pass/gbuffer.h"
-#include "sapien_vulkan/pass/transparency.h"
-#include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/composite.h"
-#include "sapien_vulkan/camera.h"
-#include "sapien_vulkan/camera_controller.h"
+#include "sapien_vulkan/pass/deferred.h"
+#include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/shadow.h"
+#include "sapien_vulkan/pass/transparency.h"
+#include "sapien_vulkan/scene.h"
 
 #include "sapien_vulkan/gui/gui.h"
 
@@ -36,9 +37,9 @@ void LoadCube(VulkanContext &context, Scene &scene) {
 
   auto mesh = VulkanMesh::CreateCube(context.getPhysicalDevice(), context.getDevice(),
                                      context.getCommandPool(), context.getGraphicsQueue());
-  auto vobj = std::make_unique<VulkanObject>(
-      context.getPhysicalDevice(), context.getDevice(),
-      context.getDescriptorPool(), context.getDescriptorSetLayouts().object.get());
+  auto vobj = std::make_unique<VulkanObject>(context.getPhysicalDevice(), context.getDevice(),
+                                             context.getDescriptorPool(),
+                                             context.getDescriptorSetLayouts().object.get());
   vobj->setMesh(mesh);
   vobj->setMaterial(mat);
   auto obj = std::make_unique<Object>(std::move(vobj));
@@ -48,7 +49,8 @@ void LoadCube(VulkanContext &context, Scene &scene) {
 }
 
 void LoadRoom(VulkanContext &context, Scene &scene) {
-  auto objs = context.loadObjects("/home/fx/Scenes/conference/conference.obj", {0.001f, 0.001f, 0.001f});
+  auto objs =
+      context.loadObjects("/home/fx/Scenes/conference/conference.obj", {0.001f, 0.001f, 0.001f});
   for (auto &obj : objs) {
     scene.addObject(std::move(obj));
   }
@@ -56,11 +58,11 @@ void LoadRoom(VulkanContext &context, Scene &scene) {
 
 void LoadSponza(VulkanContext &context, Scene &scene) {
   scene.setAmbientLight({0.3, 0.3, 0.3, 1});
-  scene.addDirectionalLight({{0,-1,-0.1,1}, {1,1,1,1}});
+  scene.addDirectionalLight({{0, -1, 0, 1}, {1, 1, 1, 1}});
 
-  scene.addPointLight({{0.5, 0.3, 0,1}, {1,0,0,1}});
-  scene.addPointLight({{  0, 0.3, 0,1}, {0,1,0,1}});
-  scene.addPointLight({{-0.5, 0.3, 0,1}, {0,0,1,1}});
+  // scene.addPointLight({{0.5, 0.3, 0, 1}, {1, 0, 0, 1}});
+  // scene.addPointLight({{0, 0.3, 0, 1}, {0, 1, 0, 1}});
+  // scene.addPointLight({{-0.5, 0.3, 0, 1}, {0, 0, 1, 1}});
 
   auto objs = context.loadObjects("/home/fx/Scenes/sponza/sponza.obj", {0.001f, 0.001f, 0.001f});
   for (auto &obj : objs) {
@@ -89,8 +91,9 @@ int main() {
   auto device = context.getDevice();
   VulkanRendererConfig config;
   config.customTextureCount = 1;
-  // auto renderer = context.createVulkanRendererForEditor(config);
-  auto renderer = context.createVulkanRenderer();
+  config.useShadowMap = 1;
+  auto renderer = context.createVulkanRendererForEditor(config);
+  // auto renderer = context.createVulkanRenderer();
   auto m = glm::mat4(1);
   m[0][0] = 0.1;
   m[1][1] = 0.1;
@@ -108,7 +111,7 @@ int main() {
 
   auto camera = context.createCamera();
 
-  FPSCameraController cameraController(*camera, {0,0,-1}, {0,1,0});
+  FPSCameraController cameraController(*camera, {0, 0, -1}, {0, 1, 0});
   cameraController.setXYZ(0, 0.3, 0);
   cameraController.setRPY(0, 0, 1.5);
 
@@ -119,16 +122,15 @@ int main() {
   vwindow->initImgui(context.getDescriptorPool(), context.getCommandPool());
 
   vwindow->updateSize(800, 600);
-  camera->aspect = 4.f/3.f;
+  camera->aspect = 4.f / 3.f;
   device.waitIdle();
 
   vk::UniqueSemaphore sceneRenderSemaphore = context.getDevice().createSemaphoreUnique({});
 
   vk::UniqueFence sceneRenderFence =
       context.getDevice().createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
-  vk::UniqueCommandBuffer sceneCommandBuffer = createCommandBuffer(context.getDevice(),
-                                                                   context.getCommandPool(),
-                                                                   vk::CommandBufferLevel::ePrimary);
+  vk::UniqueCommandBuffer sceneCommandBuffer = createCommandBuffer(
+      context.getDevice(), context.getCommandPool(), vk::CommandBufferLevel::ePrimary);
 
   glfwSetWindowSizeCallback(vwindow->getWindow(), glfw_resize_callback);
 
@@ -175,8 +177,8 @@ int main() {
 
       auto imageAcquiredSemaphore = vwindow->getImageAcquiredSemaphore();
       vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-      vk::SubmitInfo info(1, &imageAcquiredSemaphore, &waitStage, 1, &sceneCommandBuffer.get(),
-                          1, &sceneRenderSemaphore.get());
+      vk::SubmitInfo info(1, &imageAcquiredSemaphore, &waitStage, 1, &sceneCommandBuffer.get(), 1,
+                          &sceneRenderSemaphore.get());
       context.getGraphicsQueue().submit(info, {});
     }
 
@@ -186,7 +188,7 @@ int main() {
     vk::PresentInfoKHR info(1, &sceneRenderSemaphore.get(), 1, &swapchain, &fidx);
     try {
       vwindow->presentFrameWithImgui(context.getGraphicsQueue(), vwindow->getPresentQueue(),
-                                    sceneRenderSemaphore.get(), sceneRenderFence.get());
+                                     sceneRenderSemaphore.get(), sceneRenderFence.get());
     } catch (vk::OutOfDateKHRError &e) {
       gSwapchainRebuild = true;
     }
@@ -224,7 +226,6 @@ int main() {
     //   }
     //   stbi_write_png("depth.png", 800, 600, 1, img.data(), 800);
     // }
-
 
     if (vwindow->isKeyDown('q')) {
       vwindow->close();

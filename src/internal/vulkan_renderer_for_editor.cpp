@@ -6,6 +6,7 @@
 #include "sapien_vulkan/pass/composite.h"
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
+#include "sapien_vulkan/pass/shadow.h"
 #include "sapien_vulkan/pass/transparency.h"
 #include "sapien_vulkan/scene.h"
 
@@ -19,6 +20,9 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
   mAxisPass = std::make_unique<AxisPass>(context);
   mTransparencyPass = std::make_unique<TransparencyPass>(context);
   mCompositePass = std::make_unique<CompositePass>(context);
+  if (config.useShadowMap) {
+    mShadowPass = std::make_unique<ShadowPass>(context);
+  }
 
   initializeDescriptorLayouts();
 
@@ -34,6 +38,7 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
                     .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
                         mContext->getDescriptorPool(), 1, &mDescriptorSetLayouts.composite.get()))
                     .front());
+  prepareShadowResources();
 }
 
 void VulkanRendererForEditor::resize(int width, int height) {
@@ -126,6 +131,15 @@ void VulkanRendererForEditor::initializeRenderTextures() {
         vk::ImageAspectFlagBits::eColor);
   }
 
+  if (mConfig.useShadowMap) {
+    mRenderTargets.shadow = std::make_unique<VulkanImageData>(
+        mContext->getPhysicalDevice(), mContext->getDevice(), mRenderTargetFormats.depthFormat,
+        vk::Extent2D(mConfig.shadowMapSize, mConfig.shadowMapSize), 1, vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+        vk::ImageLayout::eUndefined, vk::MemoryPropertyFlagBits::eDeviceLocal,
+        vk::ImageAspectFlagBits::eDepth);
+  }
+
   auto commandBuffer = createCommandBuffer(mContext->getDevice(), mContext->getCommandPool(),
                                            vk::CommandBufferLevel::ePrimary);
 
@@ -184,6 +198,17 @@ void VulkanRendererForEditor::initializeRenderTextures() {
               vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
               vk::PipelineStageFlagBits::eTopOfPipe,
               vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
+        }
+        if (mConfig.useShadowMap) {
+          transitionImageLayout(commandBuffer, mRenderTargets.shadow.get()->mImage.get(),
+                                mRenderTargetFormats.depthFormat, vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eDepthStencilAttachmentOptimal, {},
+                                vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                                    vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+                                vk::PipelineStageFlagBits::eTopOfPipe,
+                                vk::PipelineStageFlagBits::eEarlyFragmentTests |
+                                    vk::PipelineStageFlagBits::eLateFragmentTests,
+                                vk::ImageAspectFlagBits::eDepth);
         }
       });
 
@@ -245,7 +270,25 @@ void VulkanRendererForEditor::initializeRenderTextures() {
       mCompositeDescriptorSet.get(), 0, 0, imageInfos.size(),
       vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
   mContext->getDevice().updateDescriptorSets(writeDescriptorSets, nullptr);
-}
+
+  if (mConfig.useShadowMap) {
+    imageInfos = {
+        vk::DescriptorImageInfo(mDeferredSampler.get(), mRenderTargets.shadow->mImageView.get(),
+                                vk::ImageLayout::eShaderReadOnlyOptimal),
+    };
+    vk::DescriptorBufferInfo bufferInfos = {
+        {vk::DescriptorBufferInfo(mShadowCameraUBO->getBuffer(), 0, VK_WHOLE_SIZE)}};
+
+    writeDescriptorSets = {
+        vk::WriteDescriptorSet(mDeferredShadowDescriptorSet.get(), 0, 0, 1,
+                               vk::DescriptorType::eUniformBuffer, {}, &bufferInfos, {}),
+        vk::WriteDescriptorSet(mDeferredShadowDescriptorSet.get(), 1, 0, imageInfos.size(),
+                               vk::DescriptorType::eCombinedImageSampler, imageInfos.data(),
+                               nullptr, nullptr)};
+
+    mContext->getDevice().updateDescriptorSets(writeDescriptorSets, nullptr);
+  }
+} // namespace svulkan
 
 void VulkanRendererForEditor::initializeRenderPasses() {
   assert(mWidth > 0 && mHeight > 0);
@@ -299,6 +342,9 @@ void VulkanRendererForEditor::initializeRenderPasses() {
   {
     std::vector<vk::DescriptorSetLayout> layouts = {l.scene.get(), l.camera.get(),
                                                     mDescriptorSetLayouts.deferred.get()};
+    if (mConfig.useShadowMap) {
+      layouts.push_back(mDescriptorSetLayouts.deferredShadow.get());
+    }
     mDeferredPass->initializePipeline(shaderDir, layouts, {mRenderTargetFormats.colorFormat});
     mDeferredPass->initializeFramebuffer(
         {mRenderTargets.lighting->mImageView.get()},
@@ -351,6 +397,16 @@ void VulkanRendererForEditor::initializeRenderPasses() {
         {mRenderTargets.lighting2->mImageView.get()},
         {static_cast<uint32_t>(mWidth), static_cast<uint32_t>(mHeight)});
   }
+
+  // initialize shadow pass
+  if (mConfig.useShadowMap) {
+    std::vector<vk::DescriptorSetLayout> layouts = {l.camera.get(), l.object.get()};
+    mShadowPass->initializePipeline(shaderDir, layouts, mRenderTargetFormats.depthFormat, cullMode,
+                                    vk::FrontFace::eCounterClockwise);
+    mShadowPass->initializeFramebuffer(mRenderTargets.shadow->mImageView.get(),
+                                       {static_cast<uint32_t>(mConfig.shadowMapSize),
+                                        static_cast<uint32_t>(mConfig.shadowMapSize)});
+  }
 }
 
 void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &scene,
@@ -371,6 +427,42 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
   // sync axes transform
   updateAxisUBO();
   updateStickUBO();
+
+  // shadow pass
+  if (mConfig.useShadowMap) {
+    updateShadowCameraUBO(scene, camera);
+    std::vector<vk::ClearValue> clearValues;
+    clearValues.push_back(vk::ClearDepthStencilValue(1.0f, 0)); // depth
+    vk::RenderPassBeginInfo renderPassBeginInfo{
+        mShadowPass->getRenderPass(), mShadowPass->getFramebuffer(),
+        vk::Rect2D({0, 0}, {static_cast<uint32_t>(mConfig.shadowMapSize),
+                            static_cast<uint32_t>(mConfig.shadowMapSize)}),
+        static_cast<uint32_t>(clearValues.size()), clearValues.data()};
+    commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, mShadowPass->getPipeline());
+    commandBuffer.setViewport(0, {{0.f, 0.f, static_cast<float>(mConfig.shadowMapSize),
+                                   static_cast<float>(mConfig.shadowMapSize), 0.f, 1.f}});
+    commandBuffer.setScissor(0, {{{0, 0},
+                                  {static_cast<uint32_t>(mConfig.shadowMapSize),
+                                   static_cast<uint32_t>(mConfig.shadowMapSize)}}});
+
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                     mShadowPass->getPipelineLayout(), 0,
+                                     mShadowCameraDescriptorSet.get(), nullptr);
+    for (auto &obj : scene.getOpaqueObjects()) {
+      auto vobj = obj->getVulkanObject();
+      if (vobj) {
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                         mShadowPass->getPipelineLayout(), 1,
+                                         vobj->mDescriptorSet.get(), nullptr);
+        commandBuffer.bindVertexBuffers(0, *vobj->mMesh->mVertexBuffer->mBuffer, {0});
+        commandBuffer.bindIndexBuffer(*vobj->mMesh->mIndexBuffer->mBuffer, 0,
+                                      vk::IndexType::eUint32);
+        commandBuffer.drawIndexed(vobj->mMesh->mIndexCount, 1, 0, 0, 0);
+      }
+    }
+    commandBuffer.endRenderPass();
+  }
 
   // render gbuffer pass
   {
@@ -427,26 +519,6 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
 
   // render deferred pass
   {
-    // transition to texture formats
-    // for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-    //                  mRenderTargets.specular->mImage.get(),
-    //                  mRenderTargets.normal->mImage.get()}) {
-    //   transitionImageLayout(
-    //       commandBuffer, img, mRenderTargetFormats.colorFormat,
-    //       vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-    //       vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eShaderRead,
-    //       vk::PipelineStageFlagBits::eColorAttachmentOutput,
-    //       vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eColor);
-    // }
-    // transitionImageLayout(
-    //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-    //     vk::ImageLayout::eDepthStencilAttachmentOptimal,
-    //     vk::ImageLayout::eShaderReadOnlyOptimal,
-    //     vk::AccessFlagBits::eDepthStencilAttachmentWrite, vk::AccessFlagBits::eShaderRead,
-    //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
-    //         vk::PipelineStageFlagBits::eLateFragmentTests,
-    //     vk::PipelineStageFlagBits::eFragmentShader, vk::ImageAspectFlagBits::eDepth);
-
     // draw quad
     std::vector<vk::ClearValue> clearValues = {
         vk::ClearColorValue{std::array{0.f, 0.f, 0.f, 1.f}}};
@@ -469,32 +541,13 @@ void VulkanRendererForEditor::render(vk::CommandBuffer commandBuffer, Scene &sce
     commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                      mDeferredPass->getPipelineLayout(), 2,
                                      mDeferredDescriptorSet.get(), nullptr);
-
+    if (mConfig.useShadowMap) {
+      commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                       mDeferredPass->getPipelineLayout(), 3,
+                                       mDeferredShadowDescriptorSet.get(), nullptr);
+    }
     commandBuffer.draw(3, 1, 0, 0);
     commandBuffer.endRenderPass();
-
-    // transition textures back to gbuffer formats
-    // for (auto img : {mRenderTargets.albedo->mImage.get(), mRenderTargets.position->mImage.get(),
-    //                  mRenderTargets.specular->mImage.get(),
-    //                  mRenderTargets.normal->mImage.get()}) {
-    //   transitionImageLayout(
-    //       commandBuffer, img, mRenderTargetFormats.colorFormat,
-    //       vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageLayout::eColorAttachmentOptimal,
-    //       vk::AccessFlagBits::eShaderRead,
-    //       vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-    //       vk::PipelineStageFlagBits::eFragmentShader,
-    //       vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::ImageAspectFlagBits::eColor);
-    // }
-    // transitionImageLayout(
-    //     commandBuffer, mRenderTargets.depth->mImage.get(), mRenderTargetFormats.depthFormat,
-    //     vk::ImageLayout::eShaderReadOnlyOptimal,
-    //     vk::ImageLayout::eDepthStencilAttachmentOptimal, vk::AccessFlagBits::eShaderRead,
-    //     vk::AccessFlagBits::eDepthStencilAttachmentRead |
-    //         vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-    //     vk::PipelineStageFlagBits::eFragmentShader,
-    //     vk::PipelineStageFlagBits::eEarlyFragmentTests |
-    //         vk::PipelineStageFlagBits::eLateFragmentTests,
-    //     vk::ImageAspectFlagBits::eDepth);
   }
 
   // axis pass
@@ -865,6 +918,57 @@ void VulkanRendererForEditor::initializeDescriptorLayouts() {
         {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
   }
   mDescriptorSetLayouts.composite = createDescriptorSetLayout(mContext->getDevice(), layout);
+
+  if (mConfig.useShadowMap) {
+    layout = {
+        {vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment},
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment},
+    };
+    mDescriptorSetLayouts.deferredShadow =
+        createDescriptorSetLayout(mContext->getDevice(), layout);
+  }
+}
+
+void VulkanRendererForEditor::prepareShadowResources() {
+  mShadowCameraUBO = std::make_unique<VulkanBufferData>(mContext->getPhysicalDevice(),
+                                                        mContext->getDevice(), sizeof(glm::mat4),
+                                                        vk::BufferUsageFlagBits::eUniformBuffer);
+  mShadowCameraDescriptorSet = std::move(
+      mContext->getDevice()
+          .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
+              mContext->getDescriptorPool(), 1, &mContext->getDescriptorSetLayouts().camera.get()))
+          .front());
+  updateDescriptorSets(mContext->getDevice(), mShadowCameraDescriptorSet.get(),
+                       {{vk::DescriptorType::eUniformBuffer, mShadowCameraUBO->mBuffer.get(), {}}},
+                       {}, 0);
+
+  mDeferredShadowDescriptorSet = std::move(
+      mContext->getDevice()
+          .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
+              mContext->getDescriptorPool(), 1, &mDescriptorSetLayouts.deferredShadow.get()))
+          .front());
+}
+
+void VulkanRendererForEditor::updateShadowCameraUBO(Scene &scene, Camera &camera) {
+  if (scene.getDirectionalLights().size()) {
+    glm::vec3 dir = scene.getDirectionalLights()[0].direction;
+    glm::mat4 w2c = glm::translate(glm::mat4(1), -camera.position);
+
+    glm::vec3 csLightDir = glm::normalize(w2c * glm::vec4(dir, 0));
+    glm::mat4 c2l = (glm::dot(csLightDir, glm::vec3(0, 1, 0)) > 0.95 ||
+                     glm::dot(csLightDir, glm::vec3(0, 1, 0)) < -0.95)
+                        ? glm::lookAt(glm::vec3(0, 0, 0), csLightDir, glm::vec3(1, 0, 0))
+                        : glm::lookAt(glm::vec3(0, 0, 0), csLightDir, glm::vec3(0, 1, 0));
+
+    float v = 10;
+    glm::mat4 lsProj = glm::ortho(-v, v, -v, v, -v, camera.far);
+    lsProj[1][1] *= -1;
+
+    glm::mat4 w2l = c2l * w2c;
+    glm::mat4 lightSpaceMatrix = lsProj * w2l;
+    copyToDevice<glm::mat4>(mContext->getDevice(), mShadowCameraUBO->mMemory.get(),
+                            lightSpaceMatrix);
+  }
 }
 
 } // namespace svulkan
