@@ -122,25 +122,56 @@ void VulkanContext::createInstance() {
 }
 
 void VulkanContext::pickPhysicalDevice() {
-  mPhysicalDevice = mInstance->enumeratePhysicalDevices().front();
-  auto features = mPhysicalDevice.getFeatures();
-  if (!features.independentBlend) {
-    log::critical("Failed to pick physical device: no independent blend support");
-    exit(1);
+  GLFWwindow *window;
+  VkSurfaceKHR tmpSurface;
+
+  if (mRequirePresent) {
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    window = glfwCreateWindow(1, 1, "vulkan", nullptr, nullptr);
+    auto result = glfwCreateWindowSurface(mInstance.get(), window, nullptr, &tmpSurface);
+    if (result != VK_SUCCESS) {
+      throw std::runtime_error("create window failed: glfwCreateWindowSurface failed");
+    }
+  }
+
+  vk::PhysicalDevice pickedDevice;
+  uint32_t pickedIndex;
+  for (auto device : mInstance->enumeratePhysicalDevices()) {
+    std::vector<vk::QueueFamilyProperties> queueFamilyProperties =
+        device.getQueueFamilyProperties();
+    pickedIndex = queueFamilyProperties.size();
+    for (uint32_t i = 0; i < queueFamilyProperties.size(); ++i) {
+      if (queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
+        if (mRequirePresent && !device.getSurfaceSupportKHR(i, tmpSurface)) {
+          continue;
+        }
+        pickedIndex = i;
+      }
+    }
+    if (pickedIndex == queueFamilyProperties.size()) {
+      continue;
+    }
+    auto features = device.getFeatures();
+    if (!features.independentBlend) {
+      continue;
+    }
+    pickedDevice = device;
+    break;
+  }
+  if (!pickedDevice) {
+    throw std::runtime_error("pickPhysicalDevice: no compatible device found.");
+  }
+  mPhysicalDevice = pickedDevice;
+  graphicsQueueFamilyIndex = pickedIndex;
+  if (mRequirePresent) {
+    vkDestroySurfaceKHR(mInstance.get(), tmpSurface, nullptr);
+    glfwDestroyWindow(window);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
   }
 }
 
 void VulkanContext::createLogicalDevice() {
-  std::vector<vk::QueueFamilyProperties> queueFamilyProperties =
-      mPhysicalDevice.getQueueFamilyProperties();
-  graphicsQueueFamilyIndex =
-      std::distance(queueFamilyProperties.begin(),
-                    std::find_if(queueFamilyProperties.begin(), queueFamilyProperties.end(),
-                                 [](vk::QueueFamilyProperties const &qfp) {
-                                   return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
-                                 }));
-  assert(graphicsQueueFamilyIndex < queueFamilyProperties.size());
-
   float queuePriority = 0.0f;
   vk::DeviceQueueCreateInfo deviceQueueCreateInfo(vk::DeviceQueueCreateFlags(),
                                                   static_cast<uint32_t>(graphicsQueueFamilyIndex),
@@ -216,8 +247,7 @@ std::shared_ptr<VulkanTextureData> VulkanContext::getPlaceholderTexture() {
   return mResourcesManager.getPlaceholderTexture();
 }
 
-std::shared_ptr<struct VulkanTextureData>
-VulkanContext::loadTexture(std::string const &filename) {
+std::shared_ptr<struct VulkanTextureData> VulkanContext::loadTexture(std::string const &filename) {
   return mResourcesManager.loadTexture(filename);
 }
 
@@ -244,7 +274,7 @@ std::unique_ptr<Object> VulkanContext::loadCapsule(float radius, float halfLengt
 
 std::unique_ptr<Object> VulkanContext::loadYZPlane() {
   return createObject(mResourcesManager.loadYZPlane(), createMaterial());
-} 
+}
 
 std::vector<std::unique_ptr<Object>> VulkanContext::loadObjects(std::string const &file,
                                                                 glm::vec3 scale) {
