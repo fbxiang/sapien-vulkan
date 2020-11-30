@@ -47,13 +47,6 @@ void LoadCube(VulkanContext &context, Scene &scene) {
   scene.addObject(std::move(obj));
 }
 
-void LoadRoom(VulkanContext &context, Scene &scene) {
-  auto objs = context.loadObjects("/home/fx/Scenes/conference/conference.obj", {0.001f, 0.001f, 0.001f});
-  for (auto &obj : objs) {
-    scene.addObject(std::move(obj));
-  }
-}
-
 void LoadSponza(VulkanContext &context, Scene &scene) {
   scene.setAmbientLight({0.3, 0.3, 0.3, 1});
   scene.addDirectionalLight({{0,-1,-0.1,1}, {1,1,1,1}});
@@ -62,7 +55,7 @@ void LoadSponza(VulkanContext &context, Scene &scene) {
   scene.addPointLight({{  0, 0.3, 0,1}, {0,1,0,1}});
   scene.addPointLight({{-0.5, 0.3, 0,1}, {0,0,1,1}});
 
-  auto objs = context.loadObjects("/home/fx/Scenes/sponza/sponza.obj", {0.001f, 0.001f, 0.001f});
+  auto objs = context.loadObjects("../assets/sponza/sponza.obj", {0.001f, 0.001f, 0.001f});
   for (auto &obj : objs) {
     scene.addObject(std::move(obj));
   }
