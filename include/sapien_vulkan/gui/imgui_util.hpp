@@ -9,7 +9,7 @@ vk::UniqueRenderPass createImguiRenderPass(vk::Device device, vk::Format format)
   vk::AttachmentDescription attachment{{}, format,
     vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eLoad, vk::AttachmentStoreOp::eStore,
     vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-    vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR};
+    vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR};
   vk::AttachmentReference colorAttachment{0, vk::ImageLayout::eColorAttachmentOptimal};
 
   vk::SubpassDescription subpass ({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &colorAttachment);
