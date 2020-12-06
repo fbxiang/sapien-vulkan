@@ -9,4 +9,4 @@ struct VulkanRendererConfig {
   uint32_t customTextureCount{0};
 };
 
-}
+} // namespace svulkan

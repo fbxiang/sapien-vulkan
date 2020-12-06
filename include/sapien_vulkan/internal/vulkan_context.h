@@ -22,7 +22,7 @@ class VulkanRendererForEditor;
 
 class VulkanContext {
   bool mRequirePresent;
-  bool mRayTrace;
+  uint32_t mObjectBufferSize;
 
   vk::PhysicalDevice mPhysicalDevice;
   vk::UniqueInstance mInstance;
@@ -34,8 +34,9 @@ class VulkanContext {
 
   VulkanResourcesManager mResourcesManager;
 
+
 public:
-  VulkanContext(bool requirePresent = true, bool rayTrace = false);
+  VulkanContext(bool requirePresent = true, uint32_t objectBufferSize = 1000);
   ~VulkanContext();
 
   /** Get the graphics queue */

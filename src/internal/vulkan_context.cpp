@@ -22,8 +22,9 @@ static void glfwErrorCallback(int error_code, const char *description) {
   log::error("GLFW error: {}", description);
 }
 
-VulkanContext::VulkanContext(bool requirePresent, bool rayTrace)
-    : mRequirePresent(requirePresent), mRayTrace(rayTrace), mResourcesManager(*this) {
+VulkanContext::VulkanContext(bool requirePresent, uint32_t objectBufferSize)
+    : mRequirePresent(requirePresent), mObjectBufferSize(objectBufferSize),
+      mResourcesManager(*this) {
   createInstance();
   pickPhysicalDevice();
   createLogicalDevice();
@@ -185,9 +186,6 @@ void VulkanContext::createLogicalDevice() {
     deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
 #endif
-  // if (mRayTrace) {
-  //   deviceExtensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
-  // }
   mDevice = mPhysicalDevice.createDeviceUnique(
       vk::DeviceCreateInfo(vk::DeviceCreateFlags(), 1, &deviceQueueCreateInfo, 0, nullptr,
                            deviceExtensions.size(), deviceExtensions.data(), &features));
@@ -203,18 +201,14 @@ void VulkanContext::createCommandPool() {
 }
 
 void VulkanContext::createDescriptorPool() {
-  // constexpr uint32_t numMaterials = 100;
-  // constexpr uint32_t numTextures = 100;
   mDescriptorPool = svulkan::createDescriptorPool(
-      mDevice.get(), {// {vk::DescriptorType::eUniformBuffer, numMaterials},
-                      // {vk::DescriptorType::eCombinedImageSampler, numTextures},
-                      {vk::DescriptorType::eSampler, 1000},
+      mDevice.get(), {{vk::DescriptorType::eSampler, 1000},
                       {vk::DescriptorType::eCombinedImageSampler, 1000},
                       {vk::DescriptorType::eSampledImage, 1000},
                       {vk::DescriptorType::eStorageImage, 1000},
                       {vk::DescriptorType::eUniformTexelBuffer, 1000},
                       {vk::DescriptorType::eStorageTexelBuffer, 1000},
-                      {vk::DescriptorType::eUniformBuffer, 1000},
+                      {vk::DescriptorType::eUniformBuffer, 1000 + mObjectBufferSize},
                       {vk::DescriptorType::eStorageBuffer, 1000},
                       {vk::DescriptorType::eUniformBufferDynamic, 1000},
                       {vk::DescriptorType::eStorageBufferDynamic, 1000},
