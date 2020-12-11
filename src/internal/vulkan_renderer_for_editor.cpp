@@ -693,7 +693,7 @@ void VulkanRendererForEditor::display(vk::CommandBuffer commandBuffer, vk::Image
       vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eColorAttachmentOutput,
       vk::ImageAspectFlagBits::eColor);
   transitionImageLayout(commandBuffer, swapchainImage, swapchainFormat,
-                        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::ePresentSrcKHR,
+                        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eColorAttachmentOptimal,
                         vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eMemoryRead,
                         vk::PipelineStageFlagBits::eTransfer,
                         vk::PipelineStageFlagBits::eAllCommands, vk::ImageAspectFlagBits::eColor);
