@@ -5,6 +5,7 @@ layout(set = 1, binding = 0) uniform CameraUBO {
   mat4 projectionMatrix;
   mat4 viewMatrixInverse;
   mat4 projectionMatrixInverse;
+  mat4 userData;
 } cameraUBO;
 
 layout (constant_id = 0) const uint NUM_DIRECTIONAL_LIGHTS = 3;
@@ -29,6 +30,7 @@ layout(set = 2, binding = 2) uniform sampler2D specularSampler;
 layout(set = 2, binding = 3) uniform sampler2D normalSampler;
 layout(set = 2, binding = 4) uniform sampler2D depthSampler;
 layout(set = 2, binding = 5) uniform sampler2D customSampler;
+layout(set = 2, binding = 6) uniform sampler2D lightPattern;
 
 layout(location = 0) in vec2 inUV;
 layout(location = 0) out vec4 outColor;

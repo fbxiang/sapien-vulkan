@@ -10,7 +10,7 @@ class VulkanRenderer {
   VulkanContext *mContext;
   VulkanRendererConfig mConfig;
 
-  int mWidth, mHeight;
+  int mWidth{}, mHeight{};
 
   struct DescriptorSetLayouts {
     vk::UniqueDescriptorSetLayout deferred;
@@ -48,6 +48,8 @@ class VulkanRenderer {
   vk::UniqueDescriptorSet mCompositeDescriptorSet;
   vk::UniqueSampler mCompositeSampler;
 
+  std::vector<std::shared_ptr<VulkanTextureData>> mInputTextures{};
+
 public:
   VulkanRenderer(VulkanContext &context, VulkanRendererConfig const &config);
 
@@ -76,6 +78,8 @@ public:
   std::vector<float> downloadCustom(uint32_t index);
 
   inline RenderTargets &getRenderTargets() { return mRenderTargets; }
+
+  void loadCustomTexture(uint32_t index, std::string const &filename);
 };
 
 } // namespace svulkan

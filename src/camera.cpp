@@ -1,25 +1,26 @@
 #include "sapien_vulkan/camera.h"
 
-namespace svulkan
-{
+namespace svulkan {
 
-Camera::Camera(vk::PhysicalDevice physicalDevice, vk::Device device, vk::DescriptorPool descriptorPool,
-               vk::DescriptorSetLayout descriptorLayout)
+Camera::Camera(vk::PhysicalDevice physicalDevice, vk::Device device,
+               vk::DescriptorPool descriptorPool, vk::DescriptorSetLayout descriptorLayout)
     : mDevice(device),
       mUBO(physicalDevice, device, sizeof(CameraUBO), vk::BufferUsageFlagBits::eUniformBuffer) {
 
-  mDescriptorSet = std::move(
-      device.allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(descriptorPool, 1, &descriptorLayout))
-      .front());
+  mDescriptorSet = std::move(device
+                                 .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
+                                     descriptorPool, 1, &descriptorLayout))
+                                 .front());
 
-  updateDescriptorSets(device, mDescriptorSet.get(),
-                       {{vk::DescriptorType::eUniformBuffer, mUBO.mBuffer.get(), vk::BufferView()}}, {}, 0);
+  updateDescriptorSets(
+      device, mDescriptorSet.get(),
+      {{vk::DescriptorType::eUniformBuffer, mUBO.mBuffer.get(), vk::BufferView()}}, {}, 0);
 }
 
 void Camera::updateUBO() {
-  copyToDevice<CameraUBO>(
-      mDevice, mUBO.mMemory.get(),
-      {getViewMat(), getProjectionMat(), glm::inverse(getViewMat()), glm::inverse(getProjectionMat())});
+  copyToDevice<CameraUBO>(mDevice, mUBO.mMemory.get(),
+                          {getViewMat(), getProjectionMat(), glm::inverse(getViewMat()),
+                           glm::inverse(getProjectionMat()), userData});
 }
 
 glm::mat4 Camera::getModelMat() const {
@@ -43,4 +44,4 @@ glm::mat4 Camera::getProjectionMat() const {
   return proj;
 }
 
-}
+} // namespace svulkan

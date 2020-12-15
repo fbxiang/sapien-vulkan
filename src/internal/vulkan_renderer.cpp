@@ -1,6 +1,7 @@
 #include "sapien_vulkan/internal/vulkan_renderer.h"
 #include "sapien_vulkan/camera.h"
 #include "sapien_vulkan/internal/vulkan_context.h"
+#include "sapien_vulkan/internal/vulkan_resources_manager.h"
 #include "sapien_vulkan/pass/composite.h"
 #include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
@@ -28,6 +29,18 @@ VulkanRenderer::VulkanRenderer(VulkanContext &context, VulkanRendererConfig cons
                     .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
                         mContext->getDescriptorPool(), 1, &mDescriptorSetLayouts.composite.get()))
                     .front());
+  mInputTextures.resize(mConfig.customInputTextureCount);
+  for (uint32_t i = 0; i < mConfig.customInputTextureCount; ++i) {
+    mInputTextures[i] = context.getResourcesManager().getPlaceholderTexture();
+  }
+}
+
+void VulkanRenderer::loadCustomTexture(uint32_t index, std::string const &filename) {
+  mInputTextures[index] = mContext->getResourcesManager().loadTexture(filename);
+  if (mWidth) {
+    initializeRenderTextures();
+    initializeRenderPasses();
+  }
 }
 
 void VulkanRenderer::resize(int width, int height) {
@@ -204,6 +217,12 @@ void VulkanRenderer::initializeRenderTextures() {
                                                  mRenderTargets.custom[i]->mImageView.get(),
                                                  vk::ImageLayout::eShaderReadOnlyOptimal));
   }
+  for (uint32_t i = 0; i < mConfig.customInputTextureCount; ++i) {
+    imageInfos.push_back(vk::DescriptorImageInfo(mInputTextures[i]->mTextureSampler.get(),
+                                                 mInputTextures[i]->mImageData->mImageView.get(),
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal));
+  }
+
   std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {vk::WriteDescriptorSet(
       mDeferredDescriptorSet.get(), 0, 0, imageInfos.size(),
       vk::DescriptorType::eCombinedImageSampler, imageInfos.data(), nullptr, nullptr)};
@@ -661,6 +680,10 @@ void VulkanRenderer::initializeDescriptorLayouts() {
       {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}  // depth
   };
   for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    layout.push_back(
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
+  }
+  for (uint32_t i = 0; i < mConfig.customInputTextureCount; ++i) {
     layout.push_back(
         {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
   }

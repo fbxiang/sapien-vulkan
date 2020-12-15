@@ -10,7 +10,7 @@ class VulkanRendererForEditor {
   VulkanContext *mContext;
   VulkanRendererConfig mConfig;
 
-  int mWidth, mHeight;
+  int mWidth{}, mHeight{};
 
   struct DescriptorSetLayouts {
     vk::UniqueDescriptorSetLayout deferred;
@@ -27,7 +27,7 @@ class VulkanRendererForEditor {
     std::unique_ptr<VulkanImageData> depth;
 
     std::unique_ptr<VulkanImageData> lighting;
-    std::unique_ptr<VulkanImageData> lighting2;  // ping pong buffer for lighting
+    std::unique_ptr<VulkanImageData> lighting2; // ping pong buffer for lighting
     std::vector<std::unique_ptr<VulkanImageData>> custom;
   } mRenderTargets;
 
@@ -48,6 +48,8 @@ class VulkanRendererForEditor {
 
   vk::UniqueDescriptorSet mCompositeDescriptorSet;
   vk::UniqueSampler mCompositeSampler;
+
+  std::vector<std::shared_ptr<VulkanTextureData>> mInputTextures{};
 
 public:
   VulkanRendererForEditor(VulkanContext &context, VulkanRendererConfig const &config);
@@ -87,17 +89,17 @@ public:
 private:
   // axis
   std::vector<glm::mat4> mAxesTransforms{};
-  vk::UniqueDescriptorSet mAxesDescriptorSet {};
-  std::unique_ptr<VulkanBufferData> mAxesUBO {};
-  std::shared_ptr<VulkanMesh> mAxesMesh {};
+  vk::UniqueDescriptorSet mAxesDescriptorSet{};
+  std::unique_ptr<VulkanBufferData> mAxesUBO{};
+  std::shared_ptr<VulkanMesh> mAxesMesh{};
   void updateAxisUBO();
   void prepareAxesResources();
 
   // stick
   std::vector<glm::mat4> mStickTransforms{};
-  vk::UniqueDescriptorSet mStickDescriptorSet {};
-  std::unique_ptr<VulkanBufferData> mStickUBO {};
-  std::shared_ptr<VulkanMesh> mStickMesh {};
+  vk::UniqueDescriptorSet mStickDescriptorSet{};
+  std::unique_ptr<VulkanBufferData> mStickUBO{};
+  std::shared_ptr<VulkanMesh> mStickMesh{};
   void updateStickUBO();
   void prepareStickResources();
 
@@ -109,6 +111,8 @@ public:
   void clearSticks() { mStickTransforms.clear(); }
 
   uint32_t getMaxAxisPassInstances() { return 32; }
+
+  void loadCustomTexture(uint32_t index, std::string const &filename);
 };
 
 } // namespace svulkan

@@ -16,6 +16,8 @@ struct Camera {
   float scaling = 1.f;
   bool ortho = false;
 
+  glm::mat4 userData;
+
   vk::Device mDevice;
   VulkanBufferData mUBO;
   vk::UniqueDescriptorSet mDescriptorSet;

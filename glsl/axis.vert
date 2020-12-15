@@ -9,6 +9,7 @@ layout(binding = 0, set = 1) uniform CameraUBO {
   mat4 projectionMatrix;
   mat4 viewMatrixInverse;
   mat4 projectionMatrixInverse;
+  mat4 userData;
 } cameraUBO;
 
 layout(binding = 0, set = 0) uniform ObjectUBO {

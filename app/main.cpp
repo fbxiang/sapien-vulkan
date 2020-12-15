@@ -82,8 +82,11 @@ int main() {
   auto device = context.getDevice();
   VulkanRendererConfig config;
   config.customTextureCount = 1;
-  // auto renderer = context.createVulkanRendererForEditor(config);
-  auto renderer = context.createVulkanRenderer();
+  config.customInputTextureCount = 1;
+  auto renderer = context.createVulkanRendererForEditor(config);
+  // auto renderer = context.createVulkanRenderer(config);
+  renderer->loadCustomTexture(0, "../assets/kinect-pattern_3x3.png");
+
   auto m = glm::mat4(1);
   m[0][0] = 0.1;
   m[1][1] = 0.1;
@@ -113,6 +116,9 @@ int main() {
 
   vwindow->updateSize(800, 600);
   camera->aspect = 4.f/3.f;
+  camera->userData = glm::mat4(1);
+  camera->userData[0][0] = 2;
+
   device.waitIdle();
 
   vk::UniqueSemaphore sceneRenderSemaphore = context.getDevice().createSemaphoreUnique({});

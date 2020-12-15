@@ -34,7 +34,6 @@ class VulkanContext {
 
   VulkanResourcesManager mResourcesManager;
 
-
 public:
   VulkanContext(bool requirePresent = true, uint32_t objectBufferSize = 1000);
   ~VulkanContext();
@@ -112,6 +111,8 @@ public:
 #ifdef ON_SCREEN
   std::unique_ptr<VulkanWindow> createWindow(uint32_t width = 800, uint32_t height = 600);
 #endif
+
+  inline VulkanResourcesManager &getResourcesManager() { return mResourcesManager; }
 
 public:
   static std::string gDefaultShaderDir;

@@ -34,6 +34,18 @@ VulkanRendererForEditor::VulkanRendererForEditor(VulkanContext &context,
                     .allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(
                         mContext->getDescriptorPool(), 1, &mDescriptorSetLayouts.composite.get()))
                     .front());
+  mInputTextures.resize(mConfig.customInputTextureCount);
+  for (uint32_t i = 0; i < mConfig.customInputTextureCount; ++i) {
+    mInputTextures[i] = context.getResourcesManager().getPlaceholderTexture();
+  }
+}
+
+void VulkanRendererForEditor::loadCustomTexture(uint32_t index, std::string const &filename) {
+  mInputTextures[index] = mContext->getResourcesManager().loadTexture(filename);
+  if (mWidth) {
+    initializeRenderTextures();
+    initializeRenderPasses();
+  }
 }
 
 void VulkanRendererForEditor::resize(int width, int height) {
@@ -207,6 +219,11 @@ void VulkanRendererForEditor::initializeRenderTextures() {
   for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
     imageInfos.push_back(vk::DescriptorImageInfo(mDeferredSampler.get(),
                                                  mRenderTargets.custom[i]->mImageView.get(),
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal));
+  }
+  for (uint32_t i = 0; i < mConfig.customInputTextureCount; ++i) {
+    imageInfos.push_back(vk::DescriptorImageInfo(mInputTextures[i]->mTextureSampler.get(),
+                                                 mInputTextures[i]->mImageData->mImageView.get(),
                                                  vk::ImageLayout::eShaderReadOnlyOptimal));
   }
   std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {vk::WriteDescriptorSet(
@@ -692,11 +709,11 @@ void VulkanRendererForEditor::display(vk::CommandBuffer commandBuffer, vk::Image
       vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
       vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eColorAttachmentOutput,
       vk::ImageAspectFlagBits::eColor);
-  transitionImageLayout(commandBuffer, swapchainImage, swapchainFormat,
-                        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eColorAttachmentOptimal,
-                        vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eMemoryRead,
-                        vk::PipelineStageFlagBits::eTransfer,
-                        vk::PipelineStageFlagBits::eAllCommands, vk::ImageAspectFlagBits::eColor);
+  transitionImageLayout(
+      commandBuffer, swapchainImage, swapchainFormat, vk::ImageLayout::eTransferDstOptimal,
+      vk::ImageLayout::eColorAttachmentOptimal, vk::AccessFlagBits::eTransferWrite,
+      vk::AccessFlagBits::eMemoryRead, vk::PipelineStageFlagBits::eTransfer,
+      vk::PipelineStageFlagBits::eAllCommands, vk::ImageAspectFlagBits::eColor);
 }
 
 std::vector<float> VulkanRendererForEditor::downloadAlbedo() {
@@ -842,6 +859,10 @@ void VulkanRendererForEditor::initializeDescriptorLayouts() {
       {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}  // depth
   };
   for (uint32_t i = 0; i < mConfig.customTextureCount; ++i) {
+    layout.push_back(
+        {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
+  }
+  for (uint32_t i = 0; i < mConfig.customInputTextureCount; ++i) {
     layout.push_back(
         {vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment});
   }
