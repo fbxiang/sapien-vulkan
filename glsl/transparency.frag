@@ -43,7 +43,8 @@ layout(binding = 0, set = 1) uniform CameraUBO {
   mat4 projectionMatrix;
   mat4 viewMatrixInverse;
   mat4 projectionMatrixInverse;
-  mat4 userData;
+  mat4 m1;
+  mat4 m2;
 } cameraUBO;
 
 layout (constant_id = 0) const uint NUM_DIRECTIONAL_LIGHTS = 3;

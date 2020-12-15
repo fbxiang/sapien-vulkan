@@ -16,7 +16,8 @@ struct Camera {
   float scaling = 1.f;
   bool ortho = false;
 
-  glm::mat4 userData;
+  glm::mat4 activeLightView;
+  glm::mat4 activeLightProj;
 
   vk::Device mDevice;
   VulkanBufferData mUBO;

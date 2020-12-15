@@ -5,7 +5,8 @@ layout(set = 1, binding = 0) uniform CameraUBO {
   mat4 projectionMatrix;
   mat4 viewMatrixInverse;
   mat4 projectionMatrixInverse;
-  mat4 userData;
+  mat4 lview;
+  mat4 lproj;
 } cameraUBO;
 
 layout (constant_id = 0) const uint NUM_DIRECTIONAL_LIGHTS = 3;
@@ -30,7 +31,7 @@ layout(set = 2, binding = 2) uniform sampler2D specularSampler;
 layout(set = 2, binding = 3) uniform sampler2D normalSampler;
 layout(set = 2, binding = 4) uniform sampler2D depthSampler;
 layout(set = 2, binding = 5) uniform sampler2D customSampler;
-layout(set = 2, binding = 6) uniform sampler2D lightPattern;
+layout(set = 2, binding = 6) uniform sampler2D lightPatternSampler;
 
 layout(location = 0) in vec2 inUV;
 layout(location = 0) out vec4 outColor;
@@ -95,6 +96,18 @@ void main() {
   // vec4 csPosition = getCameraSpacePosition(inUV);
   vec3 camDir = -normalize(csPosition.xyz);
 
+  vec4 wsPosition = cameraUBO.viewMatrixInverse * csPosition;
+  vec4 wsndc = (cameraUBO.lproj * cameraUBO.lview * wsPosition);
+  vec2 activeLightUV = vec2(wsndc.x, -wsndc.y) / wsndc.w * 0.5 + 0.5;
+
+  vec4 activeLightPosition = inverse(cameraUBO.lview) * vec4(0,0,0,1);
+  vec3 wsNormal = (cameraUBO.viewMatrixInverse * vec4(normal, 0)).xyz;
+
+  vec3 activeLightDir = wsPosition.xyz - activeLightPosition.xyz;
+  activeLightDir = normalize(activeLightDir);
+  float test = dot(wsNormal, -activeLightDir);
+  float activeLight = texture(lightPatternSampler, activeLightUV).x * max(dot(wsNormal, -activeLightDir), 0.f) * albedo.r;
+
   vec3 color = vec3(0.f);
   for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
     vec3 pos = world2camera(vec4(sceneUBO.pointLights[i].position.xyz, 1.f)).xyz;
@@ -148,7 +161,9 @@ void main() {
   if (depth == 1) {
     outColor = vec4(getBackgroundColor((cameraUBO.viewMatrixInverse * csPosition).xyz), 1.f);
   } else {
-    outColor = vec4(color, 1);
+    // outColor = vec4(color, activeLight);
+    outColor = vec4(vec3(activeLight), 1);
+    // outColor = vec4((activeLightUV*2-1), 0, 1);
   }
 
   // outColor = vec4(abs(normal), 1);

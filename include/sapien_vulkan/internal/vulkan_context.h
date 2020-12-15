@@ -109,7 +109,7 @@ public:
   std::shared_ptr<struct VulkanTextureData> getPlaceholderTexture();
 
 #ifdef ON_SCREEN
-  std::unique_ptr<VulkanWindow> createWindow(uint32_t width = 800, uint32_t height = 600);
+  std::unique_ptr<VulkanWindow> createWindow(uint32_t width = 640, uint32_t height = 480);
 #endif
 
   inline VulkanResourcesManager &getResourcesManager() { return mResourcesManager; }

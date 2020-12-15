@@ -1,15 +1,15 @@
+#include "sapien_vulkan/camera.h"
+#include "sapien_vulkan/camera_controller.h"
+#include "sapien_vulkan/common/log.h"
 #include "sapien_vulkan/internal/vulkan_context.h"
 #include "sapien_vulkan/internal/vulkan_renderer.h"
 #include "sapien_vulkan/internal/vulkan_renderer_for_editor.h"
-#include "sapien_vulkan/scene.h"
-#include "sapien_vulkan/common/log.h"
 #include "sapien_vulkan/pass/axis.h"
+#include "sapien_vulkan/pass/composite.h"
+#include "sapien_vulkan/pass/deferred.h"
 #include "sapien_vulkan/pass/gbuffer.h"
 #include "sapien_vulkan/pass/transparency.h"
-#include "sapien_vulkan/pass/deferred.h"
-#include "sapien_vulkan/pass/composite.h"
-#include "sapien_vulkan/camera.h"
-#include "sapien_vulkan/camera_controller.h"
+#include "sapien_vulkan/scene.h"
 
 #include "sapien_vulkan/gui/gui.h"
 
@@ -21,8 +21,8 @@
 using namespace svulkan;
 
 static bool gSwapchainRebuild = true;
-static int gSwapchainResizeWidth = 800;
-static int gSwapchainResizeHeight = 600;
+static int gSwapchainResizeWidth = 640;
+static int gSwapchainResizeHeight = 360;
 
 static void glfw_resize_callback(GLFWwindow *, int w, int h) {
   gSwapchainRebuild = true;
@@ -36,9 +36,9 @@ void LoadCube(VulkanContext &context, Scene &scene) {
 
   auto mesh = VulkanMesh::CreateCube(context.getPhysicalDevice(), context.getDevice(),
                                      context.getCommandPool(), context.getGraphicsQueue());
-  auto vobj = std::make_unique<VulkanObject>(
-      context.getPhysicalDevice(), context.getDevice(),
-      context.getDescriptorPool(), context.getDescriptorSetLayouts().object.get());
+  auto vobj = std::make_unique<VulkanObject>(context.getPhysicalDevice(), context.getDevice(),
+                                             context.getDescriptorPool(),
+                                             context.getDescriptorSetLayouts().object.get());
   vobj->setMesh(mesh);
   vobj->setMaterial(mat);
   auto obj = std::make_unique<Object>(std::move(vobj));
@@ -49,11 +49,11 @@ void LoadCube(VulkanContext &context, Scene &scene) {
 
 void LoadSponza(VulkanContext &context, Scene &scene) {
   scene.setAmbientLight({0.3, 0.3, 0.3, 1});
-  scene.addDirectionalLight({{0,-1,-0.1,1}, {1,1,1,1}});
+  scene.addDirectionalLight({{0, -1, -0.1, 1}, {1, 1, 1, 1}});
 
-  scene.addPointLight({{0.5, 0.3, 0,1}, {1,0,0,1}});
-  scene.addPointLight({{  0, 0.3, 0,1}, {0,1,0,1}});
-  scene.addPointLight({{-0.5, 0.3, 0,1}, {0,0,1,1}});
+  scene.addPointLight({{0.5, 0.3, 0, 1}, {1, 0, 0, 1}});
+  scene.addPointLight({{0, 0.3, 0, 1}, {0, 1, 0, 1}});
+  scene.addPointLight({{-0.5, 0.3, 0, 1}, {0, 0, 1, 1}});
 
   auto objs = context.loadObjects("../assets/sponza/sponza.obj", {0.001f, 0.001f, 0.001f});
   for (auto &obj : objs) {
@@ -75,6 +75,17 @@ void LoadCustom(VulkanContext &context, Scene &scene) {
   // scene.addObject(context.loadYZPlane({1, 1}));
   // auto obj = context.loadCapsule(0.1, 0.1);
   // scene.addObject(std::move(obj));
+}
+
+glm::mat4 getLightMatrixFromCamera(Camera &camera) {
+  auto cam2world = camera.getModelMat();
+  glm::mat4 light2cam(1);
+  light2cam[2][0] = 0.04f;
+  auto light2world = cam2world * light2cam;
+
+  auto lightView = glm::inverse(light2world);
+
+  return lightView;
 }
 
 int main() {
@@ -104,20 +115,20 @@ int main() {
 
   auto camera = context.createCamera();
 
-  FPSCameraController cameraController(*camera, {0,0,-1}, {0,1,0});
-  cameraController.setXYZ(0, 0.3, 0);
-  cameraController.setRPY(0, 0, 1.5);
+  FPSCameraController cameraController(*camera, {0, 0, -1}, {0, 1, 0});
+  cameraController.setXYZ(-0.04, 0.3, 0);
+  // cameraController.setRPY(0, 0, 1.5);
 
-  renderer->resize(800, 600);
+  renderer->resize(640, 360);
 
   auto vwindow = context.createWindow();
 
   vwindow->initImgui(context.getDescriptorPool(), context.getCommandPool());
+  vwindow->updateSize(640, 360);
+  camera->aspect = 4.f / 3.f;
 
-  vwindow->updateSize(800, 600);
-  camera->aspect = 4.f/3.f;
-  camera->userData = glm::mat4(1);
-  camera->userData[0][0] = 2;
+  camera->activeLightView = getLightMatrixFromCamera(*camera);
+  camera->activeLightProj = glm::perspective(glm::radians(43.f), 633.f / 495.f, 0.1f, 5.f);
 
   device.waitIdle();
 
@@ -125,9 +136,8 @@ int main() {
 
   vk::UniqueFence sceneRenderFence =
       context.getDevice().createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
-  vk::UniqueCommandBuffer sceneCommandBuffer = createCommandBuffer(context.getDevice(),
-                                                                   context.getCommandPool(),
-                                                                   vk::CommandBufferLevel::ePrimary);
+  vk::UniqueCommandBuffer sceneCommandBuffer = createCommandBuffer(
+      context.getDevice(), context.getCommandPool(), vk::CommandBufferLevel::ePrimary);
 
   glfwSetWindowSizeCallback(vwindow->getWindow(), glfw_resize_callback);
 
@@ -174,8 +184,8 @@ int main() {
 
       auto imageAcquiredSemaphore = vwindow->getImageAcquiredSemaphore();
       vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-      vk::SubmitInfo info(1, &imageAcquiredSemaphore, &waitStage, 1, &sceneCommandBuffer.get(),
-                          1, &sceneRenderSemaphore.get());
+      vk::SubmitInfo info(1, &imageAcquiredSemaphore, &waitStage, 1, &sceneCommandBuffer.get(), 1,
+                          &sceneRenderSemaphore.get());
       context.getGraphicsQueue().submit(info, {});
     }
 
@@ -185,7 +195,7 @@ int main() {
     vk::PresentInfoKHR info(1, &sceneRenderSemaphore.get(), 1, &swapchain, &fidx);
     try {
       vwindow->presentFrameWithImgui(context.getGraphicsQueue(), vwindow->getPresentQueue(),
-                                    sceneRenderSemaphore.get(), sceneRenderFence.get());
+                                     sceneRenderSemaphore.get(), sceneRenderFence.get());
     } catch (vk::OutOfDateKHRError &e) {
       gSwapchainRebuild = true;
     }
@@ -224,7 +234,6 @@ int main() {
     //   stbi_write_png("depth.png", 800, 600, 1, img.data(), 800);
     // }
 
-
     if (vwindow->isKeyDown('q')) {
       vwindow->close();
     }
@@ -233,20 +242,25 @@ int main() {
       auto [x, y] = vwindow->getMouseDelta();
       float r = 1e-3;
       cameraController.rotate(0, -r * y, -r * x);
+      camera->activeLightView = getLightMatrixFromCamera(*camera);
     }
 
     constexpr float r = 1e-3;
     if (vwindow->isKeyDown('w')) {
       cameraController.move(r, 0, 0);
+      camera->activeLightView = getLightMatrixFromCamera(*camera);
     }
     if (vwindow->isKeyDown('s')) {
       cameraController.move(-r, 0, 0);
+      camera->activeLightView = getLightMatrixFromCamera(*camera);
     }
     if (vwindow->isKeyDown('a')) {
       cameraController.move(0, r, 0);
+      camera->activeLightView = getLightMatrixFromCamera(*camera);
     }
     if (vwindow->isKeyDown('d')) {
       cameraController.move(0, -r, 0);
+      camera->activeLightView = getLightMatrixFromCamera(*camera);
     }
 
     // if (count == 1000) {

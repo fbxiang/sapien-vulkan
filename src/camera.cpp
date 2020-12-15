@@ -20,7 +20,7 @@ Camera::Camera(vk::PhysicalDevice physicalDevice, vk::Device device,
 void Camera::updateUBO() {
   copyToDevice<CameraUBO>(mDevice, mUBO.mMemory.get(),
                           {getViewMat(), getProjectionMat(), glm::inverse(getViewMat()),
-                           glm::inverse(getProjectionMat()), userData});
+                           glm::inverse(getProjectionMat()), activeLightView, activeLightProj});
 }
 
 glm::mat4 Camera::getModelMat() const {

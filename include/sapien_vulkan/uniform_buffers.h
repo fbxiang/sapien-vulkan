@@ -8,7 +8,8 @@ struct CameraUBO {
   glm::mat4 projectionMatrix;
   glm::mat4 viewMatrixInverse;
   glm::mat4 projectionMatrixInverse;
-  glm::mat4 userData;
+  glm::mat4 activeLightView;
+  glm::mat4 activeLightProj;
 };
 
 struct PBRMaterialUBO {
