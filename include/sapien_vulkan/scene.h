@@ -21,6 +21,8 @@ class Scene {
 
   bool mLightUpdated = true;
 
+  bool mNeedsForceRemove = false;
+
  public:
   Scene(std::unique_ptr<VulkanScene> vulkanScene);
 

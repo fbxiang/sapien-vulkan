@@ -1,13 +1,13 @@
 #include "sapien_vulkan/scene.h"
 
-namespace svulkan
-{
+namespace svulkan {
 
 void Scene::updateUBO() {
   if (mLightUpdated) {
-    SceneUBO ubo {};
+    SceneUBO ubo{};
     ubo.ambientLight = ambientLight;
-    for (uint32_t i = 0; i < std::min<uint32_t>(NumDirectionalLights, directionalLights.size()); ++i) {
+    for (uint32_t i = 0; i < std::min<uint32_t>(NumDirectionalLights, directionalLights.size());
+         ++i) {
       ubo.directionalLights[i] = directionalLights[i];
     }
     for (uint32_t i = 0; i < std::min<uint32_t>(NumPointLights, pointLights.size()); ++i) {
@@ -21,19 +21,23 @@ void Scene::updateUBO() {
 Scene::Scene(std::unique_ptr<VulkanScene> vulkanScene) : mVulkanScene(std::move(vulkanScene)) {}
 
 void Scene::addObject(std::unique_ptr<Object> obj) {
+  forceRemove();
   obj->setScene(this);
   objects.push_back(std::move(obj));
 }
 
-
 void Scene::forceRemove() {
-  objects.erase(std::remove_if(objects.begin(), objects.end(),
-                               [](std::unique_ptr<Object> &o) { return o->isMarkedForRemove(); }),
-                objects.end());
+  if (mNeedsForceRemove) {
+    objects.erase(
+        std::remove_if(objects.begin(), objects.end(),
+                       [](std::unique_ptr<Object> &o) { return o->isMarkedForRemove(); }),
+        objects.end());
+    mNeedsForceRemove = false;
+  }
 }
 
-
 void Scene::removeObject(Object *obj) {
+  mNeedsForceRemove = true;
   auto s = obj->getScene();
   if (s != this) {
     return;
@@ -42,6 +46,7 @@ void Scene::removeObject(Object *obj) {
 }
 
 void Scene::removeObjectsByName(std::string name) {
+  mNeedsForceRemove = true;
   for (auto &o : objects) {
     if (o->mName == name) {
       o->markForRemove();
@@ -73,7 +78,8 @@ static void prepareObjectTree(Object *obj, const glm::mat4 &parentModelMat,
                               std::vector<Object *> &opaque, std::vector<Object *> &transparent) {
   obj->mGlobalModelMatrixCache = parentModelMat * obj->getModelMat();
   if (obj->getVulkanObject() && obj->mVisibility > 0.f) {
-    if (obj->mVisibility < 1.f || obj->getMaterial()->getProperties().additionalTransparency > 0.f) {
+    if (obj->mVisibility < 1.f ||
+        obj->getMaterial()->getProperties().additionalTransparency > 0.f) {
       transparent.push_back(obj);
     } else {
       opaque.push_back(obj);
@@ -93,4 +99,4 @@ void Scene::prepareObjectsForRender() {
   }
 }
 
-}
+} // namespace svulkan
